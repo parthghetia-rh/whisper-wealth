@@ -1,0 +1,18 @@
+services:
+  folio:
+    build: .
+    container_name: folio-tracker
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      - folio-data:/data
+    environment:
+      - NODE_ENV=production
+      - HOST=0.0.0.0
+      - PORT=3000
+      - DB_PATH=/data/portfolio.db
+      - TOKEN_PATH=/data/.auth-token
+    restart: unless-stopped
+
+volumes:
+  folio-data:

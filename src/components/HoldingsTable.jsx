@@ -1,0 +1,150 @@
+import { useState } from 'react'
+import { currencySymbol } from '../utils/currency'
+
+const COLUMNS = [
+  { key: 'ticker', label: 'Ticker', align: 'left' },
+  { key: 'shares', label: 'Shares', align: 'right' },
+  { key: 'avg_cost', label: 'Avg Cost', align: 'right' },
+  { key: 'current_price', label: 'Price', align: 'right' },
+  { key: 'change_percent', label: 'Day Chg', align: 'right' },
+  { key: 'market_value', label: 'Value', align: 'right' },
+  { key: 'gain_loss', label: 'Gain/Loss', align: 'right' },
+  { key: 'dividend_yield', label: 'Div Yield', align: 'right', last: true },
+]
+
+export default function HoldingsTable({ holdings }) {
+  const [sortKey, setSortKey] = useState(null)
+  const [sortDir, setSortDir] = useState('desc')
+
+  if (!holdings?.length) {
+    return (
+      <div className="bg-surface-2 rounded-xl border border-border p-8 text-center text-text-muted">
+        No holdings yet. Add transactions to get started.
+      </div>
+    )
+  }
+
+  const handleSort = (key) => {
+    if (sortKey === key) {
+      setSortDir(sortDir === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortKey(key)
+      setSortDir(key === 'ticker' ? 'asc' : 'desc')
+    }
+  }
+
+  const sorted = [...holdings].sort((a, b) => {
+    if (!sortKey) return 0
+    let av = a[sortKey]
+    let bv = b[sortKey]
+    if (typeof av === 'string') {
+      return sortDir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av)
+    }
+    return sortDir === 'asc' ? av - bv : bv - av
+  })
+
+  const grouped = {}
+  for (const h of sorted) {
+    const c = h.currency || 'USD'
+    if (!grouped[c]) grouped[c] = []
+    grouped[c].push(h)
+  }
+
+  return (
+    <div className="space-y-4">
+      {Object.entries(grouped).map(([currency, items]) => {
+        const sym = currencySymbol(currency)
+        return (
+          <div key={currency}>
+            <div className="flex items-center gap-2 mb-2">
+              <span className="bg-surface-3 px-2 py-0.5 rounded text-xs font-semibold text-text">
+                {currency}
+              </span>
+            </div>
+            <div className="bg-surface-2 rounded-xl border border-border overflow-x-auto">
+              <table className="w-full text-sm min-w-[750px]">
+                <thead>
+                  <tr className="border-b border-border text-text-muted text-xs uppercase tracking-wider">
+                    {COLUMNS.map((col) => (
+                      <th
+                        key={col.key}
+                        onClick={() => handleSort(col.key)}
+                        className={`p-3 cursor-pointer select-none hover:text-text transition-colors ${
+                          col.align === 'left' ? 'text-left pl-4' : 'text-right'
+                        } ${col.last ? 'pr-4' : ''}`}
+                      >
+                        <span className="inline-flex items-center gap-1">
+                          {col.label}
+                          {sortKey === col.key && (
+                            <SortArrow dir={sortDir} />
+                          )}
+                        </span>
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {items.map((h) => (
+                    <tr
+                      key={h.ticker}
+                      className="border-b border-border/50 hover:bg-surface-3/50 transition-colors"
+                    >
+                      <td className="p-3 pl-4">
+                        <div className="font-medium">{h.ticker}</div>
+                        <div className="text-xs text-text-muted truncate max-w-[140px]">
+                          {h.name}
+                        </div>
+                      </td>
+                      <td className="text-right p-3 tabular-nums">{h.shares}</td>
+                      <td className="text-right p-3 tabular-nums">
+                        {sym}{h.avg_cost.toFixed(2)}
+                      </td>
+                      <td className="text-right p-3 tabular-nums font-medium">
+                        {sym}{h.current_price.toFixed(2)}
+                      </td>
+                      <td className="text-right p-3 tabular-nums">
+                        <span className={h.change >= 0 ? 'text-green' : 'text-red'}>
+                          {h.change >= 0 ? '+' : ''}
+                          {h.change.toFixed(2)} ({h.change_percent.toFixed(2)}%)
+                        </span>
+                      </td>
+                      <td className="text-right p-3 tabular-nums font-medium">
+                        {sym}{h.market_value.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                      </td>
+                      <td className="text-right p-3 tabular-nums">
+                        <span className={h.gain_loss >= 0 ? 'text-green' : 'text-red'}>
+                          {h.gain_loss >= 0 ? '+' : ''}{sym}
+                          {Math.abs(h.gain_loss).toLocaleString('en-US', {
+                            minimumFractionDigits: 2,
+                          })}
+                          <span className="text-xs ml-1">
+                            ({h.gain_loss_percent.toFixed(2)}%)
+                          </span>
+                        </span>
+                      </td>
+                      <td className="text-right p-3 pr-4 tabular-nums text-text-muted">
+                        {h.dividend_yield.toFixed(2)}%
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+function SortArrow({ dir }) {
+  return (
+    <svg width="8" height="10" viewBox="0 0 8 10" fill="currentColor" className="text-accent">
+      {dir === 'asc' ? (
+        <path d="M4 1L7.5 5.5H0.5z" />
+      ) : (
+        <path d="M4 9L0.5 4.5H7.5z" />
+      )}
+    </svg>
+  )
+}

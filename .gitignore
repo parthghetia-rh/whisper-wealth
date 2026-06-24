@@ -1,0 +1,41 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Database
+portfolio.db
+portfolio.db.tmp
+*.db
+*.db.tmp
+*.db.backup
+
+# Auth token (secret)
+.auth-token
+
+# Environment / secrets
+.env
+.env.*
+*.pem
+*.key
+*.cert
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+npm-debug.log*
+
+# Claude
+.claude/
