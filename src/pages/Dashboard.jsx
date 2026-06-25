@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import { useApi } from '../hooks/useApi'
 import { useSSE } from '../hooks/useSSE'
 import HoldingsTable from '../components/HoldingsTable'
@@ -61,6 +62,10 @@ export default function Dashboard() {
           )}
         </div>
       </div>
+
+      {currencies.length === 0 && !holdings?.length && (
+        <WelcomeBanner />
+      )}
 
       {currencies.length > 0 && (
         <>
@@ -129,6 +134,88 @@ export default function Dashboard() {
       <div>
         <h3 className="text-sm font-medium text-text-muted mb-3">Holdings</h3>
         <HoldingsTable holdings={holdings} />
+      </div>
+    </div>
+  )
+}
+
+function WelcomeBanner() {
+  return (
+    <div className="bg-surface-2 rounded-xl border border-border p-6 space-y-5">
+      <div className="flex items-center gap-3">
+        <svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="1" y="1" width="34" height="34" rx="10" className="fill-accent/15 stroke-accent" strokeWidth="1.5" />
+          <path d="M5 18 Q7 12, 9 18 Q11 24, 13 18" className="stroke-accent/50" strokeWidth="1.8" strokeLinecap="round" fill="none" />
+          <path d="M13 18 Q14.5 14, 16 18" className="stroke-accent/70" strokeWidth="1.8" strokeLinecap="round" fill="none" />
+          <rect x="18" y="20" width="3.5" height="9" rx="1.2" className="fill-accent/50" />
+          <rect x="23" y="15" width="3.5" height="14" rx="1.2" className="fill-accent/75" />
+          <rect x="28" y="9" width="3.5" height="20" rx="1.2" className="fill-accent" />
+        </svg>
+        <div>
+          <h3 className="text-lg font-semibold">Welcome to WhisperWealth</h3>
+          <p className="text-sm text-text-muted">Your private financial dashboard</p>
+        </div>
+      </div>
+
+      <p className="text-sm text-text-muted">
+        Get started by adding your first transactions. Here's how:
+      </p>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="bg-surface-3 rounded-lg p-4 space-y-2">
+          <div className="flex items-center gap-2">
+            <span className="bg-accent/20 text-accent text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center">1</span>
+            <span className="text-sm font-medium">Add transactions manually</span>
+          </div>
+          <p className="text-xs text-text-muted leading-relaxed">
+            Go to the <Link to="/transactions" className="text-accent hover:text-accent-hover">Transactions</Link> tab and
+            use the form to add buy/sell entries one at a time. Enter the ticker, shares, price, and date.
+          </p>
+        </div>
+
+        <div className="bg-surface-3 rounded-lg p-4 space-y-2">
+          <div className="flex items-center gap-2">
+            <span className="bg-accent/20 text-accent text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center">2</span>
+            <span className="text-sm font-medium">Import from CSV</span>
+          </div>
+          <p className="text-xs text-text-muted leading-relaxed">
+            Export your transaction history from your broker (Wealthsimple, Questrade, etc.) as a CSV file, then
+            click <Link to="/transactions" className="text-accent hover:text-accent-hover">Import CSV</Link> on
+            the Transactions page to bulk-import.
+          </p>
+        </div>
+
+        <div className="bg-surface-3 rounded-lg p-4 space-y-2">
+          <div className="flex items-center gap-2">
+            <span className="bg-accent/20 text-accent text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center">3</span>
+            <span className="text-sm font-medium">Track sitting cash</span>
+          </div>
+          <p className="text-xs text-text-muted leading-relaxed">
+            Head to <Link to="/cash" className="text-accent hover:text-accent-hover">Sitting Cash</Link> to add
+            your HISA or savings balances with interest rates. The projected interest feeds into your dividend income.
+          </p>
+        </div>
+
+        <div className="bg-surface-3 rounded-lg p-4 space-y-2">
+          <div className="flex items-center gap-2">
+            <span className="bg-accent/20 text-accent text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center">4</span>
+            <span className="text-sm font-medium">Build your watchlist</span>
+          </div>
+          <p className="text-xs text-text-muted leading-relaxed">
+            Visit the <Link to="/watchlist" className="text-accent hover:text-accent-hover">Watchlist</Link> tab
+            to track any ticker with live prices. Your portfolio stocks are added automatically.
+          </p>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-2 pt-1">
+        <Link
+          to="/transactions"
+          className="px-4 py-2 bg-accent hover:bg-accent-hover text-white rounded-lg text-sm font-medium transition-colors"
+        >
+          Add your first transaction
+        </Link>
+        <span className="text-xs text-text-muted">or import a CSV</span>
       </div>
     </div>
   )

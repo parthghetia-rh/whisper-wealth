@@ -1,19 +1,25 @@
-# Folio Tracker
+# WhisperWealth
+
+> Your private financial dashboard.
 
 A local-only, self-hosted portfolio tracker for monitoring stock holdings, dividends, sitting cash, and live market prices. Built for privacy — runs entirely on your machine with no external hosting, no accounts, and no telemetry.
 
 ## Features
 
-- **Transaction Management** — Add, edit, and delete buy/sell transactions for any ticker
-- **Live Market Data** — Real-time stock prices from Yahoo Finance, auto-refreshed every 5 minutes via SSE
-- **Dividend Tracking** — Projected weekly/monthly/yearly dividend income calculated from actual payment history
+- **Transaction Management** — Add, edit, delete, and CSV import buy/sell transactions for any ticker
+- **Live Market Data** — Real-time stock prices from Yahoo Finance, configurable refresh (30s to 5min)
+- **Watchlist** — Track any ticker with independent refresh controls and sortable columns
+- **Dividend Tracking** — Projected weekly/monthly/yearly dividend income from actual payment history
 - **Sitting Cash** — Track idle cash with configurable interest rates and projected interest income
 - **Multi-Currency Support** — Handles USD, CAD, INR, EUR, GBP and more with live forex conversion
 - **Currency Converter** — Toggle display currency to see your entire portfolio converted at live rates
 - **Portfolio Allocation** — Pie chart and percentage breakdown of your holdings
-- **Dividend Comparison Charts** — Visual comparison of dividend yields and payment trends across holdings
+- **Dividend Comparison Charts** — Visual comparison of dividend yields and payment trends
+- **CSV Import** — Import transactions from Wealthsimple, Questrade, or any generic CSV
 - **6 Built-in Themes** — Midnight, Carbon, Ocean, Emerald, Sunset, Rose
 - **Privacy Toggle** — Hide/show values in the allocation view
+- **Draggable Sidebar** — Reorder navigation tabs to your preference
+- **Mobile Responsive** — Collapsible sidebar, scrollable tables, stacking layouts
 - **Fully Local** — SQLite database stored on disk, server bound to localhost only
 
 ## Tech Stack
@@ -31,7 +37,7 @@ A local-only, self-hosted portfolio tracker for monitoring stock holdings, divid
 ### Docker Compose (Recommended)
 
 ```bash
-git clone <repo-url> && cd portfolio-tracker
+git clone <repo-url> && cd whisperwealth
 docker compose up -d
 ```
 
@@ -42,13 +48,13 @@ Your data is persisted in a Docker volume (`folio-data`). It survives container 
 ### Docker (Manual)
 
 ```bash
-docker build -t folio-tracker .
+docker build -t whisperwealth .
 docker run -d \
-  --name folio-tracker \
+  --name whisperwealth \
   -p 127.0.0.1:3000:3000 \
   -v folio-data:/data \
   -e DB_PATH=/data/portfolio.db \
-  folio-tracker
+  whisperwealth
 ```
 
 ### Local Development (No Docker)
@@ -91,6 +97,7 @@ Open [http://localhost:3000](http://localhost:3000)
 **For Tailscale / remote access**: When accessing via Tailscale, set `CORS_ORIGINS` to your Tailscale hostname (e.g., `CORS_ORIGINS=http://my-machine:3000`). The auth token protects your data from unauthorized access by other devices on your tailnet.
 
 **Additional hardening applied**:
+
 - Bearer token auth on all API endpoints
 - Helmet security headers (X-Content-Type-Options, X-Frame-Options, etc.)
 - Rate limiting on all API routes (120 req/min) and refresh endpoint (3 req/min)
@@ -103,6 +110,19 @@ Open [http://localhost:3000](http://localhost:3000)
 - All data stays local — only outbound calls are to Yahoo Finance for market data
 - No telemetry, no analytics, no cookies
 
+## CSV Import
+
+WhisperWealth supports importing transactions from CSV files. Go to the Transactions tab and click "Import CSV".
+
+**Supported brokers:**
+- Wealthsimple
+- Questrade
+- Generic (any CSV with Date, Symbol, Type, Quantity, Price columns)
+
+The importer auto-detects the broker format, previews parsed transactions before importing, and skips non-buy/sell rows (dividends, deposits, etc.) with clear explanations.
+
+A sample Wealthsimple CSV is included at `samples/wealthsimple-sample.csv`.
+
 ## Data & Backup
 
 Your entire portfolio lives in a single SQLite file (`portfolio.db`). To back up:
@@ -112,29 +132,33 @@ Your entire portfolio lives in a single SQLite file (`portfolio.db`). To back up
 cp portfolio.db portfolio.db.backup
 
 # Docker
-docker cp folio-tracker:/data/portfolio.db ./portfolio.db.backup
+docker cp whisperwealth:/data/portfolio.db ./portfolio.db.backup
 ```
 
 ## Project Structure
 
 ```
-portfolio-tracker/
+whisperwealth/
 ├── server/                 # Express backend
 │   ├── index.js            # Server entry, binds to localhost
+│   ├── auth.js             # Token-based authentication
 │   ├── db.js               # SQLite setup and helpers
 │   ├── routes/
-│   │   ├── transactions.js # Buy/sell CRUD
+│   │   ├── transactions.js # Buy/sell CRUD + CSV import
 │   │   ├── portfolio.js    # Holdings, summary, SSE, rates
 │   │   ├── dividends.js    # Dividend income calculations
-│   │   └── cash.js         # Sitting cash positions
+│   │   ├── cash.js         # Sitting cash positions
+│   │   └── watchlist.js    # Watchlist CRUD + quotes
 │   └── services/
 │       ├── stockService.js # Yahoo Finance API wrapper
-│       └── poller.js       # 5-min price/dividend/rate refresh
+│       ├── poller.js       # Price/dividend/rate refresh
+│       └── csvParser.js    # CSV import parser
 ├── src/                    # React frontend
-│   ├── pages/              # Dashboard, Transactions, Dividends, Cash
+│   ├── pages/              # Dashboard, Transactions, Dividends, Cash, Watchlist
 │   ├── components/         # Shared UI components
 │   ├── hooks/              # useApi, useSSE
 │   └── utils/              # Currency helpers, theme definitions
+├── samples/                # Sample CSV files for import testing
 ├── Dockerfile
 ├── docker-compose.yml
 └── package.json

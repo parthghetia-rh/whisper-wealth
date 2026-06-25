@@ -1,7 +1,7 @@
 services:
   folio:
     build: .
-    container_name: folio-tracker
+    container_name: whisperwealth
     ports:
       - "127.0.0.1:3000:3000"
     volumes:

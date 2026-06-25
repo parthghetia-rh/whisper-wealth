@@ -112,5 +112,13 @@ function stmtRun(sql, params = []) {
   return { lastInsertRowid, changes }
 }
 
-export { stmtAll, stmtGet, stmtRun }
+function stmtRunBatch(sql, params = []) {
+  db.run(sql, params)
+  const changes = db.getRowsModified()
+  const result = db.exec('SELECT last_insert_rowid() as id')
+  const lastInsertRowid = result.length > 0 ? result[0].values[0][0] : null
+  return { lastInsertRowid, changes }
+}
+
+export { stmtAll, stmtGet, stmtRun, stmtRunBatch, save }
 export default db

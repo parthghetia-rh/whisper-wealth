@@ -1,21 +1,12 @@
 import { useState, useEffect, useCallback } from 'react'
 
-let cachedToken = localStorage.getItem('folio-auth-token')
-
-async function getAuthToken() {
-  if (cachedToken) return cachedToken
-  const res = await fetch('/api/auth/token')
-  if (!res.ok) return null
-  const data = await res.json()
-  cachedToken = data.token
-  localStorage.setItem('folio-auth-token', cachedToken)
-  return cachedToken
+function getToken() {
+  return localStorage.getItem('folio-auth-token')
 }
 
 function authHeaders() {
-  const headers = {}
-  if (cachedToken) headers['Authorization'] = `Bearer ${cachedToken}`
-  return headers
+  const token = getToken()
+  return token ? { Authorization: `Bearer ${token}` } : {}
 }
 
 export function useApi(url) {
@@ -26,8 +17,12 @@ export function useApi(url) {
   const refetch = useCallback(async () => {
     setLoading(true)
     try {
-      await getAuthToken()
       const res = await fetch(url, { headers: authHeaders() })
+      if (res.status === 401) {
+        localStorage.removeItem('folio-auth-token')
+        window.location.reload()
+        return
+      }
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const json = await res.json()
       setData(json)
@@ -47,12 +42,16 @@ export function useApi(url) {
 }
 
 export async function postApi(url, body) {
-  await getAuthToken()
   const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...authHeaders() },
     body: JSON.stringify(body),
   })
+  if (res.status === 401) {
+    localStorage.removeItem('folio-auth-token')
+    window.location.reload()
+    return
+  }
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }))
     throw new Error(err.error)
@@ -61,12 +60,16 @@ export async function postApi(url, body) {
 }
 
 export async function putApi(url, body) {
-  await getAuthToken()
   const res = await fetch(url, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json', ...authHeaders() },
     body: JSON.stringify(body),
   })
+  if (res.status === 401) {
+    localStorage.removeItem('folio-auth-token')
+    window.location.reload()
+    return
+  }
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }))
     throw new Error(err.error)
@@ -75,11 +78,15 @@ export async function putApi(url, body) {
 }
 
 export async function deleteApi(url) {
-  await getAuthToken()
   const res = await fetch(url, {
     method: 'DELETE',
     headers: authHeaders(),
   })
+  if (res.status === 401) {
+    localStorage.removeItem('folio-auth-token')
+    window.location.reload()
+    return
+  }
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }))
     throw new Error(err.error)

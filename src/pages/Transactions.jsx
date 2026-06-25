@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useApi, deleteApi, putApi } from '../hooks/useApi'
 import TransactionForm from '../components/TransactionForm'
+import CSVImport from '../components/CSVImport'
 
 export default function Transactions() {
   const { data: transactions, refetch } = useApi('/api/transactions')
@@ -70,6 +71,8 @@ export default function Transactions() {
       </div>
 
       <TransactionForm onAdded={refetch} />
+
+      <CSVImport onImported={refetch} />
 
       <div>
         <h3 className="text-sm font-medium text-text-muted mb-3">History</h3>

@@ -4,7 +4,7 @@ import helmet from 'helmet'
 import rateLimit from 'express-rate-limit'
 import { dirname, join } from 'path'
 import { fileURLToPath } from 'url'
-import { authMiddleware, getToken } from './auth.js'
+import { authMiddleware, getToken, getIsFirstRun } from './auth.js'
 import transactionsRouter from './routes/transactions.js'
 import portfolioRouter from './routes/portfolio.js'
 import dividendsRouter from './routes/dividends.js'
@@ -33,17 +33,15 @@ app.use(express.json({ limit: '100kb' }))
 
 const apiLimiter = rateLimit({ windowMs: 60_000, max: 120 })
 const refreshLimiter = rateLimit({ windowMs: 60_000, max: 3 })
+const importLimiter = rateLimit({ windowMs: 60_000, max: 5 })
 
 app.use('/api', apiLimiter)
-
-app.get('/api/auth/token', (req, res) => {
-  res.json({ token: getToken() })
-})
-
 app.use('/api', authMiddleware)
 
+app.use('/api/transactions/import', importLimiter)
 app.use('/api/transactions', transactionsRouter)
 app.use('/api/portfolio/refresh', refreshLimiter)
+app.use('/api/portfolio/quick-refresh', refreshLimiter)
 app.use('/api/portfolio', portfolioRouter)
 app.use('/api/dividends', dividendsRouter)
 app.use('/api/cash', cashRouter)
@@ -62,13 +60,20 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 app.use((err, req, res, next) => {
-  console.error(err.stack)
+  console.error(process.env.NODE_ENV === 'production' ? err.message : err.stack)
   res.status(500).json({ error: 'Internal server error' })
 })
 
 app.listen(PORT, HOST, () => {
-  console.log(`Folio Tracker running at http://${HOST}:${PORT}`)
-  console.log(`Auth token: ${getToken()}`)
-  console.log('Save this token — you need it to access the app.')
+  console.log(`WhisperWealth running at http://${HOST}:${PORT}`)
+  if (getIsFirstRun()) {
+    console.log('=== FIRST RUN ===')
+    console.log(`Your auth token: ${getToken()}`)
+    console.log('Save this token — you need it to log in.')
+    console.log('This will only be shown once.')
+    console.log('=================')
+  } else {
+    console.log('Auth token loaded from file.')
+  }
   startPoller()
 })

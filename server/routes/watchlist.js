@@ -4,6 +4,7 @@ import { getQuotes } from '../services/stockService.js'
 
 const router = Router()
 const TICKER_RE = /^[A-Z0-9.\-]{1,20}$/
+const MAX_WATCHLIST = 200
 
 let cachedQuotes = {}
 let lastFetch = 0
@@ -37,7 +38,8 @@ router.post('/refresh', async (req, res) => {
     await fetchWatchlistQuotes()
     res.json({ success: true, lastFetch })
   } catch (err) {
-    res.status(500).json({ error: err.message })
+    console.error('Watchlist refresh failed:', err.message)
+    res.status(500).json({ error: 'Failed to refresh watchlist' })
   }
 })
 
@@ -49,6 +51,11 @@ router.post('/', (req, res) => {
   const sanitized = ticker.trim().toUpperCase()
   if (!TICKER_RE.test(sanitized)) {
     return res.status(400).json({ error: 'Invalid ticker format' })
+  }
+
+  const count = stmtAll('SELECT COUNT(*) as c FROM watchlist')[0]?.c || 0
+  if (count >= MAX_WATCHLIST) {
+    return res.status(400).json({ error: `Watchlist limit reached (max ${MAX_WATCHLIST})` })
   }
 
   const existing = stmtGet('SELECT 1 FROM watchlist WHERE ticker = ?', [sanitized])

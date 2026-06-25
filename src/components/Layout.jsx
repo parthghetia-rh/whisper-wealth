@@ -42,7 +42,7 @@ function getOrderedNav() {
   return order.map((path) => DEFAULT_NAV.find((n) => n.to === path)).filter(Boolean)
 }
 
-export default function Layout() {
+export default function Layout({ onLogout }) {
   const [currentTheme, setCurrentTheme] = useState(getStoredTheme)
   const [themeOpen, setThemeOpen] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -96,11 +96,11 @@ export default function Layout() {
           <div className="flex items-center gap-3">
             <Logo />
             <div>
-              <h1 className="text-lg font-semibold tracking-tight text-text leading-tight">
-                Folio
+              <h1 className="text-[15px] font-semibold tracking-tight text-text leading-tight">
+                WhisperWealth
               </h1>
-              <p className="text-[10px] text-text-muted tracking-widest uppercase">
-                Tracker
+              <p className="text-[9px] text-text-muted tracking-wide">
+                Private financial dashboard
               </p>
             </div>
           </div>
@@ -193,8 +193,16 @@ export default function Layout() {
           </div>
         )}
       </div>
-      <div className="p-4 border-t border-border">
+      <div className="p-3 border-t border-border flex items-center justify-between">
         <p className="text-[11px] text-text-muted">Localhost only</p>
+        {onLogout && (
+          <button
+            onClick={onLogout}
+            className="text-[11px] text-text-muted hover:text-red transition-colors"
+          >
+            Log out
+          </button>
+        )}
       </div>
     </>
   )
@@ -231,7 +239,7 @@ export default function Layout() {
           </button>
           <div className="flex items-center gap-2">
             <Logo size={24} />
-            <span className="text-sm font-semibold text-text">Folio</span>
+            <span className="text-sm font-semibold text-text">WhisperWealth</span>
           </div>
         </div>
         <main className="flex-1 overflow-auto p-4 md:p-6">
@@ -274,12 +282,11 @@ function Logo({ size = 36 }) {
   return (
     <svg width={size} height={size} viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
       <rect x="1" y="1" width="34" height="34" rx="10" className="fill-accent/15 stroke-accent" strokeWidth="1.5" />
-      <rect x="7" y="20" width="4" height="9" rx="1.5" className="fill-accent/40" />
-      <rect x="13" y="16" width="4" height="13" rx="1.5" className="fill-accent/60" />
-      <rect x="19" y="12" width="4" height="17" rx="1.5" className="fill-accent/80" />
-      <rect x="25" y="7" width="4" height="22" rx="1.5" className="fill-accent" />
-      <path d="M8 17L14 12L20 14L28 6" className="stroke-green" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M24 6H28V10" className="stroke-green" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M5 18 Q7 12, 9 18 Q11 24, 13 18" className="stroke-accent/50" strokeWidth="1.8" strokeLinecap="round" fill="none" />
+      <path d="M13 18 Q14.5 14, 16 18" className="stroke-accent/70" strokeWidth="1.8" strokeLinecap="round" fill="none" />
+      <rect x="18" y="20" width="3.5" height="9" rx="1.2" className="fill-accent/50" />
+      <rect x="23" y="15" width="3.5" height="14" rx="1.2" className="fill-accent/75" />
+      <rect x="28" y="9" width="3.5" height="20" rx="1.2" className="fill-accent" />
     </svg>
   )
 }
