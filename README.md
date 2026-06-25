@@ -172,4 +172,8 @@ This project was built with the assistance of **Claude** by Anthropic. The code 
 
 ## License
 
-MIT
+Copyright (c) 2026 WhisperWealth. All rights reserved.
+
+This software is proprietary. You may not copy, modify, distribute, or use this software without explicit written permission from the copyright holder. See [LICENSE](LICENSE) for details.
+
+Built with the assistance of **Claude** by Anthropic.
