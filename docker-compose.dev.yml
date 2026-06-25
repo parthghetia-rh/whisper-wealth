@@ -1,7 +1,7 @@
 services:
   whisperwealth:
-    image: ghcr.io/parthghetia-rh/portfolio-tracker:latest
-    container_name: whisperwealth
+    build: .
+    container_name: whisperwealth-dev
     ports:
       - "127.0.0.1:3000:3000"
     volumes:

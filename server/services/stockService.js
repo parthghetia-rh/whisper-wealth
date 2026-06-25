@@ -32,6 +32,51 @@ export async function getQuotes(tickers) {
   return results
 }
 
+export async function getPeriodChanges(ticker) {
+  const now = new Date()
+  const changes = {}
+
+  for (const [label, months] of [['3m', 3], ['6m', 6], ['1y', 12]]) {
+    try {
+      const start = new Date(now)
+      start.setMonth(start.getMonth() - months)
+      const result = await yahooFinance.chart(ticker, {
+        period1: start.toISOString().split('T')[0],
+        period2: now.toISOString().split('T')[0],
+        interval: '1d',
+      })
+      const quotes = result.quotes || []
+      if (quotes.length >= 2) {
+        const first = quotes[0].close
+        const last = quotes[quotes.length - 1].close
+        changes[label] = first > 0 ? Math.round(((last - first) / first) * 10000) / 100 : 0
+      }
+    } catch {
+      changes[label] = null
+    }
+  }
+
+  return changes
+}
+
+export async function getChartData(ticker, range) {
+  const now = new Date()
+  const months = { '1m': 1, '3m': 3, '6m': 6, '1y': 12 }[range] || 12
+  const start = new Date(now)
+  start.setMonth(start.getMonth() - months)
+
+  const result = await yahooFinance.chart(ticker, {
+    period1: start.toISOString().split('T')[0],
+    period2: now.toISOString().split('T')[0],
+    interval: months <= 3 ? '1d' : '1wk',
+  })
+
+  return (result.quotes || []).map((q) => ({
+    date: q.date?.toISOString().split('T')[0],
+    close: Math.round((q.close ?? 0) * 100) / 100,
+  })).filter((q) => q.date && q.close > 0)
+}
+
 export async function getExchangeRates(currencies) {
   const rates = { USD: 1 }
   const nonUsd = currencies.filter((c) => c !== 'USD')

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useApi, postApi, deleteApi } from '../hooks/useApi'
 import { currencySymbol } from '../utils/currency'
+import TickerChart from '../components/TickerChart'
 
 const INTERVALS = [
   { label: '10s', value: 10_000 },
@@ -13,13 +14,14 @@ const INTERVALS = [
 const STORAGE_KEY = 'watchlist-refresh-interval'
 
 const WL_COLUMNS = [
-  { key: 'ticker', label: 'Ticker', align: 'left', get: (q) => q?.ticker || '' },
-  { key: 'name', label: 'Name', align: 'left', get: (q) => q?.name || '' },
-  { key: 'price', label: 'Price', align: 'right', get: (q) => q?.price ?? 0 },
-  { key: 'change', label: 'Change', align: 'right', get: (q) => q?.change ?? 0 },
-  { key: 'change_percent', label: '% Change', align: 'right', get: (q) => q?.change_percent ?? 0 },
-  { key: 'previous_close', label: 'Prev Close', align: 'right', get: (q) => q?.previous_close ?? 0 },
-  { key: 'dividend_yield', label: 'Div Yield', align: 'right', get: (q) => q?.dividend_yield ?? 0 },
+  { key: 'ticker', label: 'Ticker', align: 'left', get: (q) => q?.ticker || '', getP: () => null },
+  { key: 'name', label: 'Name', align: 'left', get: (q) => q?.name || '', getP: () => null },
+  { key: 'price', label: 'Price', align: 'right', get: (q) => q?.price ?? 0, getP: () => null },
+  { key: 'change_percent', label: 'Day', align: 'right', get: (q) => q?.change_percent ?? 0, getP: () => null },
+  { key: '3m', label: '3M', align: 'right', get: () => 0, getP: (p) => p?.['3m'] ?? null },
+  { key: '6m', label: '6M', align: 'right', get: () => 0, getP: (p) => p?.['6m'] ?? null },
+  { key: '1y', label: '1Y', align: 'right', get: () => 0, getP: (p) => p?.['1y'] ?? null },
+  { key: 'dividend_yield', label: 'Yield', align: 'right', get: (q) => q?.dividend_yield ?? 0, getP: () => null },
 ]
 
 export default function Watchlist() {
@@ -31,6 +33,7 @@ export default function Watchlist() {
   const [lastRefresh, setLastRefresh] = useState(null)
   const [sortKey, setSortKey] = useState(null)
   const [sortDir, setSortDir] = useState('desc')
+  const [expandedTicker, setExpandedTicker] = useState(null)
   const [interval, setIntervalMs] = useState(() => {
     const saved = localStorage.getItem(STORAGE_KEY)
     return saved ? Number(saved) : 30_000
@@ -101,8 +104,14 @@ export default function Watchlist() {
     if (!sortKey) return 0
     const col = WL_COLUMNS.find((c) => c.key === sortKey)
     if (!col) return 0
-    const av = col.get(a.quote)
-    const bv = col.get(b.quote)
+    let av, bv
+    if (['3m', '6m', '1y'].includes(sortKey)) {
+      av = col.getP(a.periodChanges) ?? -Infinity
+      bv = col.getP(b.periodChanges) ?? -Infinity
+    } else {
+      av = col.get(a.quote)
+      bv = col.get(b.quote)
+    }
     if (typeof av === 'string') {
       return sortDir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av)
     }
@@ -186,7 +195,7 @@ export default function Watchlist() {
         </div>
       ) : (
         <div className="bg-surface-2 rounded-xl border border-border overflow-x-auto">
-          <table className="w-full text-sm min-w-[700px]">
+          <table className="w-full text-sm min-w-[800px]">
             <thead>
               <tr className="border-b border-border text-text-muted text-xs uppercase tracking-wider">
                 {WL_COLUMNS.map((col) => (
@@ -209,11 +218,14 @@ export default function Watchlist() {
             <tbody>
               {sortedItems.map((item) => {
                 const q = item.quote
+                const pc = item.periodChanges
+                const isExpanded = expandedTicker === item.ticker
+
                 if (!q) {
                   return (
                     <tr key={item.id} className="border-b border-border/30">
                       <td className="p-3 pl-4 font-medium">{item.ticker}</td>
-                      <td className="p-3 text-text-muted text-xs" colSpan={5}>
+                      <td className="p-3 text-text-muted text-xs" colSpan={6}>
                         Loading...
                       </td>
                       <td />
@@ -228,59 +240,67 @@ export default function Watchlist() {
                     </tr>
                   )
                 }
+
                 const up = q.change >= 0
                 const sym = currencySymbol(q.currency)
+
                 return (
-                  <tr
-                    key={item.id}
-                    className="border-b border-border/30 hover:bg-surface-3/40 transition-colors"
-                  >
-                    <td className="p-3 pl-4">
-                      <div className="flex items-center gap-2.5">
-                        <div className={`w-1.5 h-6 rounded-full ${up ? 'bg-green' : 'bg-red'}`} />
-                        <div>
-                          <div className="font-medium">{q.ticker}</div>
-                          <div className="text-[10px] text-text-muted">{q.currency}</div>
+                  <>
+                    <tr
+                      key={item.id}
+                      onClick={() => setExpandedTicker(isExpanded ? null : item.ticker)}
+                      className={`border-b border-border/30 cursor-pointer transition-colors ${
+                        isExpanded ? 'bg-surface-3/40' : 'hover:bg-surface-3/40'
+                      }`}
+                    >
+                      <td className="p-3 pl-4">
+                        <div className="flex items-center gap-2.5">
+                          <div className={`w-1.5 h-6 rounded-full ${up ? 'bg-green' : 'bg-red'}`} />
+                          <div>
+                            <div className="font-medium">{q.ticker}</div>
+                            <div className="text-[10px] text-text-muted">{q.currency}</div>
+                          </div>
                         </div>
-                      </div>
-                    </td>
-                    <td className="p-3 text-text-muted text-xs truncate max-w-[180px]">
-                      {q.name}
-                    </td>
-                    <td className="text-right p-3 tabular-nums font-medium">
-                      {sym}{q.price.toFixed(2)}
-                    </td>
-                    <td className="text-right p-3 tabular-nums">
-                      <span className={up ? 'text-green' : 'text-red'}>
-                        {up ? '+' : ''}{q.change.toFixed(2)}
-                      </span>
-                    </td>
-                    <td className="text-right p-3">
-                      <span
-                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium tabular-nums ${
-                          up ? 'bg-green/15 text-green' : 'bg-red/15 text-red'
-                        }`}
-                      >
-                        {up ? <UpArrow /> : <DownArrow />}
-                        {up ? '+' : ''}{q.change_percent.toFixed(2)}%
-                      </span>
-                    </td>
-                    <td className="text-right p-3 tabular-nums text-text-muted">
-                      {sym}{q.previous_close.toFixed(2)}
-                    </td>
-                    <td className="text-right p-3 tabular-nums text-text-muted">
-                      {q.dividend_yield > 0 ? `${q.dividend_yield.toFixed(2)}%` : '—'}
-                    </td>
-                    <td className="text-right p-3 pr-4">
-                      <button
-                        onClick={() => handleDelete(item.id)}
-                        className="text-text-muted hover:text-red transition-colors p-1"
-                        title="Remove from watchlist"
-                      >
-                        <TrashIcon />
-                      </button>
-                    </td>
-                  </tr>
+                      </td>
+                      <td className="p-3 text-text-muted text-xs truncate max-w-[150px]">
+                        {q.name}
+                      </td>
+                      <td className="text-right p-3 tabular-nums font-medium">
+                        {sym}{q.price.toFixed(2)}
+                      </td>
+                      <td className="text-right p-3">
+                        <PctBadge value={q.change_percent} />
+                      </td>
+                      <td className="text-right p-3">
+                        <PctBadge value={pc?.['3m']} />
+                      </td>
+                      <td className="text-right p-3">
+                        <PctBadge value={pc?.['6m']} />
+                      </td>
+                      <td className="text-right p-3">
+                        <PctBadge value={pc?.['1y']} />
+                      </td>
+                      <td className="text-right p-3 tabular-nums text-text-muted">
+                        {q.dividend_yield > 0 ? `${q.dividend_yield.toFixed(2)}%` : '—'}
+                      </td>
+                      <td className="text-right p-3 pr-4">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleDelete(item.id) }}
+                          className="text-text-muted hover:text-red transition-colors p-1"
+                          title="Remove from watchlist"
+                        >
+                          <TrashIcon />
+                        </button>
+                      </td>
+                    </tr>
+                    {isExpanded && (
+                      <tr key={`${item.id}-chart`}>
+                        <td colSpan={9} className="p-0">
+                          <TickerChart ticker={item.ticker} currency={q.currency} />
+                        </td>
+                      </tr>
+                    )}
+                  </>
                 )
               })}
             </tbody>
@@ -288,6 +308,20 @@ export default function Watchlist() {
         </div>
       )}
     </div>
+  )
+}
+
+function PctBadge({ value }) {
+  if (value == null) return <span className="text-text-muted text-xs">—</span>
+  const up = value >= 0
+  return (
+    <span
+      className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-xs font-medium tabular-nums ${
+        up ? 'bg-green/15 text-green' : 'bg-red/15 text-red'
+      }`}
+    >
+      {up ? '+' : ''}{value.toFixed(2)}%
+    </span>
   )
 }
 
@@ -307,22 +341,6 @@ function TrashIcon() {
   return (
     <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
       <path d="M3 3.5h8M5.5 3.5V2.5a1 1 0 011-1h1a1 1 0 011 1v1M9.5 3.5v7a1 1 0 01-1 1h-3a1 1 0 01-1-1v-7" />
-    </svg>
-  )
-}
-
-function UpArrow() {
-  return (
-    <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor">
-      <path d="M5 2L8.5 6.5H1.5z" />
-    </svg>
-  )
-}
-
-function DownArrow() {
-  return (
-    <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor">
-      <path d="M5 8L1.5 3.5H8.5z" />
     </svg>
   )
 }

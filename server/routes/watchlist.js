@@ -1,12 +1,13 @@
 import { Router } from 'express'
 import { stmtAll, stmtGet, stmtRun } from '../db.js'
-import { getQuotes } from '../services/stockService.js'
+import { getQuotes, getPeriodChanges, getChartData } from '../services/stockService.js'
 
 const router = Router()
 const TICKER_RE = /^[A-Z0-9.\-]{1,20}$/
 const MAX_WATCHLIST = 200
 
 let cachedQuotes = {}
+let cachedPeriodChanges = {}
 let lastFetch = 0
 
 async function fetchWatchlistQuotes() {
@@ -21,6 +22,15 @@ async function fetchWatchlistQuotes() {
   }
   cachedQuotes = map
   lastFetch = Date.now()
+
+  for (const ticker of tickers) {
+    try {
+      cachedPeriodChanges[ticker] = await getPeriodChanges(ticker)
+    } catch {
+      cachedPeriodChanges[ticker] = {}
+    }
+  }
+
   return map
 }
 
@@ -29,8 +39,27 @@ router.get('/', (req, res) => {
   const result = rows.map((r) => ({
     ...r,
     quote: cachedQuotes[r.ticker] || null,
+    periodChanges: cachedPeriodChanges[r.ticker] || null,
   }))
   res.json({ items: result, lastFetch })
+})
+
+router.get('/chart/:ticker', async (req, res) => {
+  const ticker = req.params.ticker.trim().toUpperCase()
+  if (!TICKER_RE.test(ticker)) {
+    return res.status(400).json({ error: 'Invalid ticker' })
+  }
+  const range = ['1m', '3m', '6m', '1y'].includes(req.query.range)
+    ? req.query.range
+    : '1y'
+
+  try {
+    const data = await getChartData(ticker, range)
+    res.json({ ticker, range, data })
+  } catch (err) {
+    console.error(`Chart fetch failed for ${ticker}:`, err.message)
+    res.status(500).json({ error: 'Failed to fetch chart data' })
+  }
 })
 
 router.post('/refresh', async (req, res) => {

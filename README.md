@@ -68,25 +68,65 @@ Most portfolio trackers require you to hand your financial data to a third party
 
 ### Docker Compose (Recommended)
 
+No source code needed — just create a `docker-compose.yml`:
+
+```yaml
+services:
+  whisperwealth:
+    image: ghcr.io/parthghetia-rh/portfolio-tracker:latest
+    container_name: whisperwealth
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      - folio-data:/data
+    environment:
+      - NODE_ENV=production
+      - HOST=0.0.0.0
+      - PORT=3000
+      - DB_PATH=/data/portfolio.db
+      - TOKEN_PATH=/data/.auth-token
+    restart: unless-stopped
+
+volumes:
+  folio-data:
+```
+
+Then run:
+
 ```bash
-git clone <repo-url> && cd whisperwealth
 docker compose up -d
 ```
 
 Open [http://localhost:3000](http://localhost:3000)
 
-Your data is persisted in a Docker volume (`folio-data`). It survives container rebuilds.
+On first launch, check `docker logs whisperwealth` for your auth token.
+
+Your data is persisted in a Docker volume (`folio-data`). It survives container restarts and updates.
+
+**To update:**
+
+```bash
+docker compose pull
+docker compose up -d
+```
 
 ### Docker (Manual)
 
 ```bash
-docker build -t whisperwealth .
 docker run -d \
   --name whisperwealth \
   -p 127.0.0.1:3000:3000 \
   -v folio-data:/data \
   -e DB_PATH=/data/portfolio.db \
-  whisperwealth
+  -e TOKEN_PATH=/data/.auth-token \
+  ghcr.io/parthghetia-rh/portfolio-tracker:latest
+```
+
+### Build from Source (Docker)
+
+```bash
+git clone https://github.com/parthghetia-rh/portfolio-tracker.git && cd portfolio-tracker
+docker compose -f docker-compose.dev.yml up -d --build
 ```
 
 ### Local Development (No Docker)
@@ -94,6 +134,7 @@ docker run -d \
 Requires Node.js 20+.
 
 ```bash
+git clone https://github.com/parthghetia-rh/portfolio-tracker.git && cd portfolio-tracker
 npm install
 npm run dev
 ```
