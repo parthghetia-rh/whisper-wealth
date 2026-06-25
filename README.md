@@ -1,12 +1,42 @@
-# WhisperWealth
+<p align="center">
+  <img src="public/favicon.svg" width="80" height="80" alt="WhisperWealth Logo" />
+</p>
 
-> Your private financial dashboard.
+<h1 align="center">WhisperWealth</h1>
 
-A local-only, self-hosted portfolio tracker for monitoring stock holdings, dividends, sitting cash, and live market prices. Built for privacy — runs entirely on your machine with no external hosting, no accounts, and no telemetry.
+<p align="center">
+  <strong>Your private financial dashboard.</strong>
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/self--hosted-localhost%20only-22c55e?style=flat-square" alt="Self-hosted" />
+  <img src="https://img.shields.io/badge/auth-token%20based-6366f1?style=flat-square" alt="Auth" />
+  <img src="https://img.shields.io/badge/data-SQLite%20local-f59e0b?style=flat-square" alt="SQLite" />
+  <img src="https://img.shields.io/badge/docker-ready-06b6d4?style=flat-square" alt="Docker" />
+  <img src="https://img.shields.io/badge/license-AGPL--3.0-22c55e?style=flat-square" alt="License" />
+</p>
+
+<p align="center">
+  A local-only, self-hosted portfolio tracker for monitoring stock holdings, dividends, sitting cash, and live market prices. Built for privacy — runs entirely on your machine with no external hosting, no accounts, and no telemetry.
+</p>
+
+---
+
+## Why WhisperWealth?
+
+Most portfolio trackers require you to hand your financial data to a third party. WhisperWealth flips that — your data never leaves your machine. No cloud, no accounts, no tracking. Just a clean, fast dashboard running on your own hardware.
+
+- **Zero data collection** — No telemetry, analytics, or cookies. Ever.
+- **One-command deploy** — `docker compose up -d` and you're running.
+- **Broker agnostic** — Import from any broker via CSV/TSV with a universal column mapper.
+- **Multi-currency native** — Track CAD, USD, INR, EUR, GBP holdings side by side with live forex conversion.
+- **Tailscale ready** — Access securely from any device on your private network.
+
+---
 
 ## Features
 
-- **Transaction Management** — Add, edit, delete, and CSV import buy/sell transactions for any ticker
+- **Transaction Management** — Add, edit, delete, and CSV/TSV import buy/sell transactions for any ticker
 - **Live Market Data** — Real-time stock prices from Yahoo Finance, configurable refresh (30s to 5min)
 - **Watchlist** — Track any ticker with independent refresh controls and sortable columns
 - **Dividend Tracking** — Projected weekly/monthly/yearly dividend income from actual payment history
@@ -15,11 +45,13 @@ A local-only, self-hosted portfolio tracker for monitoring stock holdings, divid
 - **Currency Converter** — Toggle display currency to see your entire portfolio converted at live rates
 - **Portfolio Allocation** — Pie chart and percentage breakdown of your holdings
 - **Dividend Comparison Charts** — Visual comparison of dividend yields and payment trends
-- **CSV Import** — Import transactions from Wealthsimple, Questrade, or any generic CSV
+- **Universal CSV Import** — Column mapper works with Wealthsimple, Questrade, or any broker export
+- **Exchange-Aware Import** — Automatically appends .TO, .NE, .NS suffixes based on the exchange column
 - **6 Built-in Themes** — Midnight, Carbon, Ocean, Emerald, Sunset, Rose
 - **Privacy Toggle** — Hide/show values in the allocation view
 - **Draggable Sidebar** — Reorder navigation tabs to your preference
 - **Mobile Responsive** — Collapsible sidebar, scrollable tables, stacking layouts
+- **Token Auth** — Auto-generated bearer token, login page, timing-safe comparison
 - **Fully Local** — SQLite database stored on disk, server bound to localhost only
 
 ## Tech Stack
@@ -172,8 +204,8 @@ This project was built with the assistance of **Claude** by Anthropic. The code 
 
 ## License
 
-Copyright (c) 2026 WhisperWealth. All rights reserved.
+Copyright (c) 2026 WhisperWealth.
 
-This software is proprietary. You may not copy, modify, distribute, or use this software without explicit written permission from the copyright holder. See [LICENSE](LICENSE) for details.
+Licensed under the [GNU Affero General Public License v3.0](LICENSE). You are free to use, modify, and distribute this software, provided that any modified versions are also made available under the same license. See [LICENSE](LICENSE) for full terms.
 
 Built with the assistance of **Claude** by Anthropic.
