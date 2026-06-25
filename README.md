@@ -73,7 +73,7 @@ No source code needed — just create a `docker-compose.yml`:
 ```yaml
 services:
   whisperwealth:
-    image: ghcr.io/parthghetia-rh/portfolio-tracker:latest
+    image: ghcr.io/parthghetia-rh/whisper-wealth:latest
     container_name: whisperwealth
     ports:
       - "127.0.0.1:3000:3000"
@@ -119,13 +119,13 @@ docker run -d \
   -v folio-data:/data \
   -e DB_PATH=/data/portfolio.db \
   -e TOKEN_PATH=/data/.auth-token \
-  ghcr.io/parthghetia-rh/portfolio-tracker:latest
+  ghcr.io/parthghetia-rh/whisper-wealth:latest
 ```
 
 ### Build from Source (Docker)
 
 ```bash
-git clone https://github.com/parthghetia-rh/portfolio-tracker.git && cd portfolio-tracker
+git clone https://github.com/parthghetia-rh/whisper-wealth.git && cd portfolio-tracker
 docker compose -f docker-compose.dev.yml up -d --build
 ```
 
@@ -134,7 +134,7 @@ docker compose -f docker-compose.dev.yml up -d --build
 Requires Node.js 20+.
 
 ```bash
-git clone https://github.com/parthghetia-rh/portfolio-tracker.git && cd portfolio-tracker
+git clone https://github.com/parthghetia-rh/whisper-wealth.git && cd portfolio-tracker
 npm install
 npm run dev
 ```
