@@ -212,6 +212,13 @@ export default function CSVImport({ onImported }) {
               hints={['symbol', 'ticker', 'stock']}
             />
             <MappingSelect
+              label="Exchange (for suffix: TSX → .TO)"
+              value={mapping.exchangeCol}
+              onChange={(v) => updateMapping('exchangeCol', v)}
+              headers={headers}
+              hints={['exchange', 'mic', 'market', 'stock exchange']}
+            />
+            <MappingSelect
               label="Shares / Quantity *"
               value={mapping.sharesCol}
               onChange={(v) => updateMapping('sharesCol', v)}

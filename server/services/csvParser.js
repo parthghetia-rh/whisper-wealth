@@ -73,9 +73,64 @@ export function parseHeaders(text) {
   return { headers, rowCount: rows.length, delimiter: delimiter === '\t' ? 'tab' : 'comma', sample }
 }
 
+const EXCHANGE_SUFFIX = {
+  TSX: '.TO',
+  XTSE: '.TO',
+  TOR: '.TO',
+  TSXV: '.V',
+  NEO: '.NE',
+  XNEO: '.NE',
+  CNSX: '.CN',
+  NYSE: '',
+  XNYS: '',
+  NASDAQ: '',
+  XNAS: '',
+  ARCA: '',
+  ARCX: '',
+  BATS: '',
+  NSE: '.NS',
+  XNSE: '.NS',
+  BSE: '.BO',
+  XBOM: '.BO',
+  LSE: '.L',
+  XLON: '.L',
+  ASX: '.AX',
+  XASX: '.AX',
+  HKG: '.HK',
+  XHKG: '.HK',
+  FRA: '.F',
+  XFRA: '.F',
+}
+
+function resolveTickerWithExchange(rawTicker, exchangeValue) {
+  if (rawTicker.includes('.')) return rawTicker
+
+  if (!exchangeValue) return rawTicker
+
+  const ex = exchangeValue.trim().toUpperCase()
+  const suffix = EXCHANGE_SUFFIX[ex]
+  if (suffix === undefined) return rawTicker
+  return rawTicker + suffix
+}
+
+export function getExchangeList() {
+  const seen = new Set()
+  return Object.entries(EXCHANGE_SUFFIX)
+    .filter(([k]) => {
+      if (seen.has(EXCHANGE_SUFFIX[k] + k.slice(0, 2))) return false
+      seen.add(EXCHANGE_SUFFIX[k] + k.slice(0, 2))
+      return true
+    })
+    .map(([code, suffix]) => ({
+      code,
+      suffix: suffix || '(none)',
+      example: `MSFT → MSFT${suffix}`,
+    }))
+}
+
 export function importWithMapping(text, mapping) {
   const { rows } = parseFile(text)
-  const { mode, tickerCol, sharesCol, priceCol, dateCol, typeCol, bookValueCol } = mapping
+  const { mode, tickerCol, sharesCol, priceCol, dateCol, typeCol, bookValueCol, exchangeCol } = mapping
 
   if (!tickerCol || !sharesCol) {
     return { transactions: [], skipped: [], error: 'Ticker and Shares columns are required' }
@@ -88,11 +143,13 @@ export function importWithMapping(text, mapping) {
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i]
 
-    const ticker = (row[tickerCol] || '').trim().toUpperCase()
-    if (!ticker || !/^[A-Z0-9.\-]{1,20}$/.test(ticker)) {
+    const rawTicker = (row[tickerCol] || '').trim().toUpperCase()
+    if (!rawTicker || !/^[A-Z0-9.\-]{1,20}$/.test(rawTicker)) {
       skipped.push({ row: i + 2, reason: `Invalid ticker "${row[tickerCol]}"` })
       continue
     }
+    const exchangeValue = exchangeCol ? row[exchangeCol] : null
+    const ticker = resolveTickerWithExchange(rawTicker, exchangeValue)
 
     const shares = normalizeAmount(row[sharesCol])
     if (!Number.isFinite(shares) || shares <= 0) {
