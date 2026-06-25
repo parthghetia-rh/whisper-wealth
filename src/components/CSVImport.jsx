@@ -1,87 +1,116 @@
 import { useState, useRef } from 'react'
 import { postApi } from '../hooks/useApi'
 
-const BROKERS = [
-  { id: 'wealthsimple', label: 'Wealthsimple' },
-  { id: 'questrade', label: 'Questrade' },
-  { id: 'generic', label: 'Generic / Other' },
-]
+const NONE = ''
 
 export default function CSVImport({ onImported }) {
   const [open, setOpen] = useState(false)
-  const [broker, setBroker] = useState('wealthsimple')
+  const [step, setStep] = useState('upload')
   const [csvText, setCsvText] = useState('')
   const [fileName, setFileName] = useState(null)
+  const [headers, setHeaders] = useState([])
+  const [sample, setSample] = useState([])
+  const [delimiter, setDelimiter] = useState('')
+  const [rowCount, setRowCount] = useState(0)
+  const [mode, setMode] = useState('transactions')
+  const [mapping, setMapping] = useState({})
   const [preview, setPreview] = useState(null)
-  const [importing, setImporting] = useState(false)
   const [result, setResult] = useState(null)
   const [error, setError] = useState(null)
+  const [loading, setLoading] = useState(false)
   const [dragOver, setDragOver] = useState(false)
   const fileRef = useRef(null)
 
   const reset = () => {
+    setStep('upload')
     setCsvText('')
     setFileName(null)
+    setHeaders([])
+    setSample([])
+    setMapping({})
     setPreview(null)
     setResult(null)
     setError(null)
+    setMode('transactions')
   }
 
-  const handleFile = (file) => {
+  const handleFile = async (file) => {
     if (!file) return
     setFileName(file.name)
     setError(null)
     setResult(null)
     setPreview(null)
-    const reader = new FileReader()
-    reader.onload = (e) => {
-      setCsvText(e.target.result)
+
+    const text = await file.text()
+    setCsvText(text)
+
+    try {
+      const data = await postApi('/api/transactions/import/parse', { csv: text })
+      setHeaders(data.headers)
+      setSample(data.sample)
+      setRowCount(data.rowCount)
+      setDelimiter(data.delimiter)
+      setMapping({})
+      setStep('map')
+    } catch (err) {
+      setError(err.message)
     }
-    reader.readAsText(file)
   }
 
   const handleDrop = (e) => {
     e.preventDefault()
     setDragOver(false)
     const file = e.dataTransfer.files[0]
-    if (file && (file.name.endsWith('.csv') || file.type === 'text/csv')) {
-      handleFile(file)
-    } else {
-      setError('Please drop a CSV file')
-    }
+    if (file) handleFile(file)
+  }
+
+  const updateMapping = (key, value) => {
+    setMapping((m) => ({ ...m, [key]: value || NONE }))
   }
 
   const handlePreview = async () => {
+    setLoading(true)
     setError(null)
-    setResult(null)
     try {
+      const fullMapping = { ...mapping, mode }
       const data = await postApi('/api/transactions/import/preview', {
         csv: csvText,
-        broker,
+        mapping: fullMapping,
       })
       setPreview(data)
+      setStep('preview')
     } catch (err) {
       setError(err.message)
+    } finally {
+      setLoading(false)
     }
   }
 
   const handleImport = async () => {
-    setImporting(true)
+    setLoading(true)
     setError(null)
     try {
+      const fullMapping = { ...mapping, mode }
       const data = await postApi('/api/transactions/import', {
         csv: csvText,
-        broker,
+        mapping: fullMapping,
       })
       setResult(data)
-      setPreview(null)
+      setStep('done')
       onImported?.()
     } catch (err) {
       setError(err.message)
     } finally {
-      setImporting(false)
+      setLoading(false)
     }
   }
+
+  const canPreview =
+    mapping.tickerCol &&
+    mapping.sharesCol &&
+    (mode === 'holdings'
+      ? mapping.bookValueCol || mapping.priceCol
+      : mapping.priceCol)
 
   if (!open) {
     return (
@@ -92,7 +121,7 @@ export default function CSVImport({ onImported }) {
         <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
           <path d="M7 1v8M4 5l3-3 3 3M2 10v2h10v-2" />
         </svg>
-        Import CSV
+        Import CSV / TSV
       </button>
     )
   }
@@ -100,7 +129,7 @@ export default function CSVImport({ onImported }) {
   return (
     <div className="bg-surface-2 rounded-xl border border-border p-5 space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-medium">Import Transactions from CSV</h3>
+        <h3 className="text-sm font-medium">Import Transactions</h3>
         <button
           onClick={() => { setOpen(false); reset() }}
           className="text-text-muted hover:text-text p-1"
@@ -111,81 +140,184 @@ export default function CSVImport({ onImported }) {
         </button>
       </div>
 
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="sm:w-48">
-          <label className="block text-xs text-text-muted mb-1">Broker</label>
-          <select
-            value={broker}
-            onChange={(e) => setBroker(e.target.value)}
-            className="w-full bg-surface-3 border border-border rounded-lg px-3 py-2 text-sm text-text outline-none focus:border-accent"
-          >
-            {BROKERS.map((b) => (
-              <option key={b.id} value={b.id}>{b.label}</option>
-            ))}
-          </select>
-        </div>
+      {error && (
+        <div className="text-red text-xs bg-red/10 rounded-lg px-3 py-2">{error}</div>
+      )}
 
-        <div className="flex-1">
-          <label className="block text-xs text-text-muted mb-1">CSV File</label>
-          <div
-            onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
-            onDragLeave={() => setDragOver(false)}
-            onDrop={handleDrop}
-            onClick={() => fileRef.current?.click()}
-            className={`border-2 border-dashed rounded-lg px-4 py-3 text-center cursor-pointer transition-colors ${
-              dragOver
-                ? 'border-accent bg-accent/5'
-                : fileName
-                  ? 'border-green/50 bg-green/5'
-                  : 'border-border hover:border-accent/50'
-            }`}
-          >
-            <input
-              ref={fileRef}
-              type="file"
-              accept=".csv"
-              className="hidden"
-              onChange={(e) => handleFile(e.target.files[0])}
+      {step === 'upload' && (
+        <div
+          onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={handleDrop}
+          onClick={() => fileRef.current?.click()}
+          className={`border-2 border-dashed rounded-lg px-6 py-8 text-center cursor-pointer transition-colors ${
+            dragOver ? 'border-accent bg-accent/5' : 'border-border hover:border-accent/50'
+          }`}
+        >
+          <input
+            ref={fileRef}
+            type="file"
+            accept=".csv,.tsv,.txt"
+            className="hidden"
+            onChange={(e) => handleFile(e.target.files[0])}
+          />
+          <p className="text-sm text-text-muted">
+            Drop any CSV or TSV file here, or click to browse
+          </p>
+          <p className="text-xs text-text-muted/60 mt-1">
+            Works with Wealthsimple, Questrade, or any broker export
+          </p>
+        </div>
+      )}
+
+      {step === 'map' && (
+        <div className="space-y-4">
+          <div className="flex items-center gap-3 text-xs text-text-muted">
+            <span className="bg-surface-3 px-2 py-0.5 rounded font-medium text-text">
+              {fileName}
+            </span>
+            <span>{rowCount} rows</span>
+            <span>{delimiter === 'tab' ? 'Tab-separated' : 'Comma-separated'}</span>
+            <span>{headers.length} columns</span>
+          </div>
+
+          <div>
+            <label className="block text-xs text-text-muted mb-1.5">Import mode</label>
+            <div className="flex rounded-lg border border-border overflow-hidden w-fit">
+              <button
+                onClick={() => setMode('transactions')}
+                className={`px-3 py-1.5 text-xs font-medium transition-colors ${
+                  mode === 'transactions' ? 'bg-accent text-white' : 'bg-surface-3 text-text-muted hover:text-text'
+                }`}
+              >
+                Transaction History
+              </button>
+              <button
+                onClick={() => setMode('holdings')}
+                className={`px-3 py-1.5 text-xs font-medium transition-colors ${
+                  mode === 'holdings' ? 'bg-accent text-white' : 'bg-surface-3 text-text-muted hover:text-text'
+                }`}
+              >
+                Current Holdings
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+            <MappingSelect
+              label="Ticker / Symbol *"
+              value={mapping.tickerCol}
+              onChange={(v) => updateMapping('tickerCol', v)}
+              headers={headers}
+              hints={['symbol', 'ticker', 'stock']}
             />
-            {fileName ? (
-              <span className="text-sm text-green">{fileName}</span>
+            <MappingSelect
+              label="Shares / Quantity *"
+              value={mapping.sharesCol}
+              onChange={(v) => updateMapping('sharesCol', v)}
+              headers={headers}
+              hints={['quantity', 'shares', 'qty', 'units']}
+            />
+            {mode === 'holdings' ? (
+              <>
+                <MappingSelect
+                  label="Book Value (total cost)"
+                  value={mapping.bookValueCol}
+                  onChange={(v) => updateMapping('bookValueCol', v)}
+                  headers={headers}
+                  hints={['book value', 'cost', 'total cost']}
+                />
+                <MappingSelect
+                  label="Price (fallback if no book value)"
+                  value={mapping.priceCol}
+                  onChange={(v) => updateMapping('priceCol', v)}
+                  headers={headers}
+                  hints={['market price', 'price', 'last price']}
+                />
+              </>
             ) : (
-              <span className="text-sm text-text-muted">
-                Drop CSV here or click to browse
-              </span>
+              <>
+                <MappingSelect
+                  label="Price per Share *"
+                  value={mapping.priceCol}
+                  onChange={(v) => updateMapping('priceCol', v)}
+                  headers={headers}
+                  hints={['price', 'market price', 'unit price', 'cost']}
+                />
+                <MappingSelect
+                  label="Date"
+                  value={mapping.dateCol}
+                  onChange={(v) => updateMapping('dateCol', v)}
+                  headers={headers}
+                  hints={['date', 'trade date', 'transaction date', 'settlement']}
+                />
+                <MappingSelect
+                  label="Type (buy/sell)"
+                  value={mapping.typeCol}
+                  onChange={(v) => updateMapping('typeCol', v)}
+                  headers={headers}
+                  hints={['type', 'action', 'side', 'transaction type']}
+                />
+              </>
             )}
           </div>
-        </div>
-      </div>
 
-      {error && (
-        <div className="text-red text-xs bg-red/10 rounded-lg px-3 py-2">
-          {error}
+          {sample.length > 0 && (
+            <details className="text-xs">
+              <summary className="text-text-muted cursor-pointer hover:text-text">
+                Preview first {sample.length} rows
+              </summary>
+              <div className="mt-2 overflow-x-auto bg-surface-3 rounded-lg border border-border">
+                <table className="text-[11px] min-w-full">
+                  <thead>
+                    <tr className="border-b border-border">
+                      {headers.map((h) => (
+                        <th key={h} className="text-left p-1.5 px-2 text-text-muted whitespace-nowrap">
+                          {h}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sample.map((row, i) => (
+                      <tr key={i} className="border-b border-border/30">
+                        {headers.map((h) => (
+                          <td key={h} className="p-1.5 px-2 whitespace-nowrap truncate max-w-[150px]">
+                            {row[h]}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </details>
+          )}
+
+          <div className="flex gap-3">
+            <button
+              onClick={handlePreview}
+              disabled={!canPreview || loading}
+              className="px-4 py-2 bg-accent hover:bg-accent-hover text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+            >
+              {loading ? 'Parsing...' : 'Preview'}
+            </button>
+            <button
+              onClick={reset}
+              className="px-4 py-2 bg-surface-3 border border-border rounded-lg text-sm text-text-muted hover:text-text transition-colors"
+            >
+              Start over
+            </button>
+          </div>
         </div>
       )}
 
-      {result && (
-        <div className="text-green text-xs bg-green/10 rounded-lg px-3 py-2">
-          Imported {result.imported} transaction{result.imported !== 1 ? 's' : ''}
-          {result.skipped > 0 && ` (${result.skipped} rows skipped — dividends, deposits, etc.)`}
-        </div>
-      )}
-
-      {csvText && !preview && !result && (
-        <button
-          onClick={handlePreview}
-          className="px-4 py-2 bg-surface-3 border border-border rounded-lg text-sm text-text hover:bg-surface-3/80 transition-colors"
-        >
-          Preview
-        </button>
-      )}
-
-      {preview && (
+      {step === 'preview' && preview && (
         <div className="space-y-3">
           <div className="flex items-center gap-4 text-xs text-text-muted">
-            <span>Broker: <span className="text-text font-medium">{preview.broker}</span></span>
             <span>Valid: <span className="text-green font-medium">{preview.transactions.length}</span></span>
             <span>Skipped: <span className="text-text-muted font-medium">{preview.skipped.length}</span></span>
+            <span className="bg-surface-3 px-2 py-0.5 rounded">{mode === 'holdings' ? 'Holdings import' : 'Transaction import'}</span>
           </div>
 
           {preview.transactions.length > 0 && (
@@ -229,13 +361,11 @@ export default function CSVImport({ onImported }) {
           {preview.skipped.length > 0 && (
             <details className="text-xs">
               <summary className="text-text-muted cursor-pointer hover:text-text">
-                {preview.skipped.length} rows skipped (click to see why)
+                {preview.skipped.length} rows skipped
               </summary>
               <div className="mt-2 space-y-1">
                 {preview.skipped.map((s, i) => (
-                  <div key={i} className="text-text-muted">
-                    Row {s.row}: {s.reason}
-                  </div>
+                  <div key={i} className="text-text-muted">Row {s.row}: {s.reason}</div>
                 ))}
               </div>
             </details>
@@ -244,20 +374,63 @@ export default function CSVImport({ onImported }) {
           <div className="flex gap-3">
             <button
               onClick={handleImport}
-              disabled={importing || !preview.transactions.length}
+              disabled={loading || !preview.transactions.length}
               className="px-4 py-2 bg-accent hover:bg-accent-hover text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
             >
-              {importing ? 'Importing...' : `Import ${preview.transactions.length} Transaction${preview.transactions.length !== 1 ? 's' : ''}`}
+              {loading ? 'Importing...' : `Import ${preview.transactions.length} Transaction${preview.transactions.length !== 1 ? 's' : ''}`}
             </button>
             <button
-              onClick={reset}
+              onClick={() => setStep('map')}
               className="px-4 py-2 bg-surface-3 border border-border rounded-lg text-sm text-text-muted hover:text-text transition-colors"
             >
-              Cancel
+              Back to mapping
             </button>
           </div>
         </div>
       )}
+
+      {step === 'done' && result && (
+        <div className="space-y-3">
+          <div className="text-green text-sm bg-green/10 rounded-lg px-4 py-3">
+            Imported {result.imported} transaction{result.imported !== 1 ? 's' : ''} successfully
+            {result.skipped > 0 && ` (${result.skipped} rows skipped)`}
+          </div>
+          <button
+            onClick={reset}
+            className="px-4 py-2 bg-surface-3 border border-border rounded-lg text-sm text-text-muted hover:text-text transition-colors"
+          >
+            Import another file
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function MappingSelect({ label, value, onChange, headers, hints }) {
+  const autoDetected = !value && hints
+    ? headers.find((h) => hints.some((hint) => h.toLowerCase().includes(hint)))
+    : null
+
+  const effectiveValue = value || autoDetected || NONE
+
+  if (!value && autoDetected) {
+    setTimeout(() => onChange(autoDetected), 0)
+  }
+
+  return (
+    <div>
+      <label className="block text-xs text-text-muted mb-1">{label}</label>
+      <select
+        value={effectiveValue}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full bg-surface-3 border border-border rounded-lg px-3 py-2 text-sm text-text outline-none focus:border-accent transition-colors"
+      >
+        <option value="">— Skip —</option>
+        {headers.map((h) => (
+          <option key={h} value={h}>{h}</option>
+        ))}
+      </select>
     </div>
   )
 }

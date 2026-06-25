@@ -1,0 +1,7 @@
+Account Name	Account Type	Account Classification	Account Number	Symbol	Exchange	MIC	Name	Security Type	Quantity	Position Direction	Market Price	Market Price Currency	Book Value (CAD)	Book Value Currency (CAD)	Book Value (Market)	Book Value Currency (Market)	Market Value	Market Value Currency	Market Unrealized Returns	Market Unrealized Returns Currency
+TFSA	TFSA	tax_free_savings_account	ABC123	AAPL.TO	TSX	XTSE	APPLE CDR (CAD HEDGED)	equity	130.5435	long	41.55	CAD	4327.52	CAD	4327.52	CAD	5421.60	CAD	1094.08	CAD
+RRSP	RRSP	registered_retirement_savings_plan	DEF456	IBM	NYSE	XNYS	International Business Machines	equity	142.64	long	264.70	USD	38080.60	CAD	38080.60	USD	37748.41	USD	-332.19	USD
+TFSA	TFSA	tax_free_savings_account	ABC123	GOOG.TO	TSX	XTSE	ALPHABET CDR (CAD HEDGED)	equity	50	long	55.03	CAD	2125.00	CAD	2125.00	CAD	2751.50	CAD	626.50	CAD
+TFSA	TFSA	tax_free_savings_account	ABC123	ENB.TO	TSX	XTSE	ENBRIDGE INC	equity	100	long	78.72	CAD	5520.00	CAD	5520.00	CAD	7872.00	CAD	2352.00	CAD
+TFSA	TFSA	tax_free_savings_account	ABC123	BANK.TO	TSX	XTSE	EVOLVE CDN BANKS LIFECOS ENH YL	etf	500	long	11.55	CAD	4625.00	CAD	4625.00	CAD	5775.00	CAD	1150.00	CAD
+TFSA	TFSA	tax_free_savings_account	ABC123	NVDA.TO	TSX	XTSE	NVIDIA CDR (CAD HEDGED)	equity	50	long	44.60	CAD	1900.00	CAD	1900.00	CAD	2230.00	CAD	330.00	CAD

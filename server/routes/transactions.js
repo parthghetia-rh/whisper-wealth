@@ -1,7 +1,7 @@
 import { Router } from 'express'
 import { stmtAll, stmtGet, stmtRun, stmtRunBatch, save } from '../db.js'
 import { triggerPoll } from '../services/poller.js'
-import { importCSV, getPresets } from '../services/csvParser.js'
+import { parseHeaders, importWithMapping } from '../services/csvParser.js'
 
 const router = Router()
 const TICKER_RE = /^[A-Z0-9.\-]{1,20}$/
@@ -109,16 +109,23 @@ router.delete('/:id', (req, res) => {
   res.json({ success: true })
 })
 
-router.get('/import/presets', (req, res) => {
-  res.json(getPresets())
+router.post('/import/parse', (req, res) => {
+  const { csv } = req.body
+  if (!csv || typeof csv !== 'string') {
+    return res.status(400).json({ error: 'File data is required' })
+  }
+  res.json(parseHeaders(csv))
 })
 
 router.post('/import/preview', (req, res) => {
-  const { csv, broker } = req.body
+  const { csv, mapping } = req.body
   if (!csv || typeof csv !== 'string') {
-    return res.status(400).json({ error: 'CSV data is required' })
+    return res.status(400).json({ error: 'File data is required' })
   }
-  const result = importCSV(csv, broker || null)
+  if (!mapping) {
+    return res.status(400).json({ error: 'Column mapping is required' })
+  }
+  const result = importWithMapping(csv, mapping)
   if (result.error) {
     return res.status(400).json({ error: result.error })
   }
@@ -126,19 +133,22 @@ router.post('/import/preview', (req, res) => {
 })
 
 router.post('/import', (req, res) => {
-  const { csv, broker } = req.body
+  const { csv, mapping } = req.body
   if (!csv || typeof csv !== 'string') {
-    return res.status(400).json({ error: 'CSV data is required' })
+    return res.status(400).json({ error: 'File data is required' })
   }
-  const result = importCSV(csv, broker || null)
+  if (!mapping) {
+    return res.status(400).json({ error: 'Column mapping is required' })
+  }
+  const result = importWithMapping(csv, mapping)
   if (result.error) {
     return res.status(400).json({ error: result.error })
   }
   if (!result.transactions.length) {
-    return res.status(400).json({ error: 'No valid buy/sell transactions found in CSV' })
+    return res.status(400).json({ error: 'No valid transactions found' })
   }
   if (result.transactions.length > 500) {
-    return res.status(400).json({ error: 'CSV too large — max 500 transactions per import' })
+    return res.status(400).json({ error: 'Too many rows — max 500 per import' })
   }
 
   let imported = 0
@@ -154,15 +164,9 @@ router.post('/import', (req, res) => {
     imported++
   }
   save()
-
   triggerPoll()
 
-  res.json({
-    imported,
-    skipped: result.skipped.length,
-    skippedDetails: result.skipped,
-    broker: result.broker,
-  })
+  res.json({ imported, skipped: result.skipped.length, skippedDetails: result.skipped })
 })
 
 export default router
