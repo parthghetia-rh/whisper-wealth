@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { currencySymbol } from '../utils/currency'
+import StockCard from './StockCard'
 
 const COLUMNS = [
   { key: 'ticker', label: 'Ticker', align: 'left' },
@@ -10,6 +11,15 @@ const COLUMNS = [
   { key: 'market_value', label: 'Value', align: 'right' },
   { key: 'gain_loss', label: 'Gain/Loss', align: 'right' },
   { key: 'dividend_yield', label: 'Div Yield', align: 'right', last: true },
+]
+
+const SORT_OPTIONS = [
+  { key: null, label: 'Default' },
+  { key: 'gain_loss', label: 'Gain/Loss' },
+  { key: 'change_percent', label: 'Day Change' },
+  { key: 'market_value', label: 'Value' },
+  { key: 'dividend_yield', label: 'Yield' },
+  { key: 'ticker', label: 'Ticker' },
 ]
 
 export default function HoldingsTable({ holdings }) {
@@ -52,6 +62,32 @@ export default function HoldingsTable({ holdings }) {
 
   return (
     <div className="space-y-4">
+      {/* Mobile sort control */}
+      <div className="md:hidden flex items-center gap-2">
+        <span className="text-xs text-text-muted">Sort:</span>
+        <select
+          value={sortKey || ''}
+          onChange={(e) => {
+            const key = e.target.value || null
+            setSortKey(key)
+            setSortDir(key === 'ticker' ? 'asc' : 'desc')
+          }}
+          className="bg-surface-3 border border-border rounded-lg px-2 py-1.5 text-xs text-text outline-none"
+        >
+          {SORT_OPTIONS.map((o) => (
+            <option key={o.key || 'default'} value={o.key || ''}>{o.label}</option>
+          ))}
+        </select>
+        {sortKey && (
+          <button
+            onClick={() => setSortDir(sortDir === 'asc' ? 'desc' : 'asc')}
+            className="text-xs text-text-muted hover:text-text"
+          >
+            {sortDir === 'asc' ? 'Low first' : 'High first'}
+          </button>
+        )}
+      </div>
+
       {Object.entries(grouped).map(([currency, items]) => {
         const sym = currencySymbol(currency)
         return (
@@ -61,7 +97,16 @@ export default function HoldingsTable({ holdings }) {
                 {currency}
               </span>
             </div>
-            <div className="bg-surface-2 rounded-xl border border-border overflow-x-auto">
+
+            {/* Mobile: card view */}
+            <div className="md:hidden space-y-2">
+              {items.map((h) => (
+                <StockCard key={h.ticker} item={h} variant="holding" />
+              ))}
+            </div>
+
+            {/* Desktop: table view */}
+            <div className="hidden md:block bg-surface-2 rounded-xl border border-border overflow-x-auto">
               <table className="w-full text-sm min-w-[750px]">
                 <thead>
                   <tr className="border-b border-border text-text-muted text-xs uppercase tracking-wider">

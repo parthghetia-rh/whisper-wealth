@@ -3,11 +3,11 @@ import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { themes, getStoredTheme, applyTheme } from '../utils/themes'
 
 const DEFAULT_NAV = [
-  { to: '/', label: 'Dashboard', icon: 'dashboard' },
-  { to: '/transactions', label: 'Transactions', icon: 'transactions' },
-  { to: '/dividends', label: 'Dividends', icon: 'dividends' },
-  { to: '/cash', label: 'Sitting Cash', icon: 'cash' },
-  { to: '/watchlist', label: 'Watchlist', icon: 'watchlist' },
+  { to: '/', label: 'Dashboard', icon: 'dashboard', short: 'Home' },
+  { to: '/transactions', label: 'Transactions', icon: 'transactions', short: 'Trade' },
+  { to: '/dividends', label: 'Dividends', icon: 'dividends', short: 'Divs' },
+  { to: '/cash', label: 'Sitting Cash', icon: 'cash', short: 'Cash' },
+  { to: '/watchlist', label: 'Watchlist', icon: 'watchlist', short: 'Watch' },
 ]
 
 const ICONS = {
@@ -45,7 +45,7 @@ function getOrderedNav() {
 export default function Layout({ onLogout }) {
   const [currentTheme, setCurrentTheme] = useState(getStoredTheme)
   const [themeOpen, setThemeOpen] = useState(false)
-  const [mobileOpen, setMobileOpen] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const [navItems, setNavItems] = useState(getOrderedNav)
   const [dragIdx, setDragIdx] = useState(null)
   const [overIdx, setOverIdx] = useState(null)
@@ -57,7 +57,7 @@ export default function Layout({ onLogout }) {
   }, [currentTheme])
 
   useEffect(() => {
-    setMobileOpen(false)
+    setSettingsOpen(false)
   }, [location.pathname])
 
   const handleDragStart = (e, idx) => {
@@ -89,10 +89,11 @@ export default function Layout({ onLogout }) {
     setOverIdx(null)
   }
 
-  const sidebar = (
-    <>
-      <div className="p-5 border-b border-border">
-        <div className="flex items-center justify-between">
+  return (
+    <div className="flex h-screen">
+      {/* Desktop sidebar */}
+      <nav className="hidden md:flex w-56 bg-surface-2 border-r border-border flex-col shrink-0">
+        <div className="p-5 border-b border-border">
           <div className="flex items-center gap-3">
             <Logo />
             <div>
@@ -104,147 +105,184 @@ export default function Layout({ onLogout }) {
               </p>
             </div>
           </div>
-          <button
-            onClick={() => setMobileOpen(false)}
-            className="md:hidden p-1 text-text-muted hover:text-text"
-          >
-            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-              <path d="M5 5l10 10M15 5l-10 10" />
-            </svg>
-          </button>
         </div>
-      </div>
-      <div className="flex-1 py-3 px-2 space-y-0.5 overflow-y-auto">
-        {navItems.map(({ to, label, icon }, idx) => {
-          const Icon = ICONS[icon]
-          return (
-            <NavLink
-              key={to}
-              to={to}
-              end={to === '/'}
-              draggable
-              onDragStart={(e) => handleDragStart(e, idx)}
-              onDragOver={(e) => handleDragOver(e, idx)}
-              onDrop={(e) => handleDrop(e, idx)}
-              onDragEnd={handleDragEnd}
-              className={({ isActive }) =>
-                `flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors select-none ${
-                  isActive
-                    ? 'bg-accent/15 text-accent-hover font-medium'
-                    : 'text-text-muted hover:text-text hover:bg-surface-3'
-                } ${dragIdx === idx ? 'opacity-40' : ''} ${
-                  overIdx === idx && dragIdx !== idx
-                    ? 'border-t-2 border-accent'
-                    : ''
-                }`
-              }
+        <div className="flex-1 py-3 px-2 space-y-0.5 overflow-y-auto">
+          {navItems.map(({ to, label, icon }, idx) => {
+            const Icon = ICONS[icon]
+            return (
+              <NavLink
+                key={to}
+                to={to}
+                end={to === '/'}
+                draggable
+                onDragStart={(e) => handleDragStart(e, idx)}
+                onDragOver={(e) => handleDragOver(e, idx)}
+                onDrop={(e) => handleDrop(e, idx)}
+                onDragEnd={handleDragEnd}
+                className={({ isActive }) =>
+                  `flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors select-none ${
+                    isActive
+                      ? 'bg-accent/15 text-accent-hover font-medium'
+                      : 'text-text-muted hover:text-text hover:bg-surface-3'
+                  } ${dragIdx === idx ? 'opacity-40' : ''} ${
+                    overIdx === idx && dragIdx !== idx
+                      ? 'border-t-2 border-accent'
+                      : ''
+                  }`
+                }
+              >
+                <svg
+                  width="8" height="12" viewBox="0 0 8 12" fill="currentColor"
+                  className="shrink-0 cursor-grab"
+                  style={{ opacity: 0.2 }}
+                >
+                  <circle cx="2" cy="2" r="1" />
+                  <circle cx="6" cy="2" r="1" />
+                  <circle cx="2" cy="6" r="1" />
+                  <circle cx="6" cy="6" r="1" />
+                  <circle cx="2" cy="10" r="1" />
+                  <circle cx="6" cy="10" r="1" />
+                </svg>
+                <Icon />
+                {label}
+              </NavLink>
+            )
+          })}
+        </div>
+        <div className="px-2 pb-2">
+          <button
+            onClick={() => setThemeOpen(!themeOpen)}
+            className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-text-muted hover:text-text hover:bg-surface-3 transition-colors w-full"
+          >
+            <div
+              className="w-4 h-4 rounded-full border border-border"
+              style={{ backgroundColor: themes[currentTheme]?.swatch }}
+            />
+            Theme
+          </button>
+          {themeOpen && (
+            <div className="mt-1 p-2 bg-surface-3 rounded-lg border border-border space-y-1">
+              {Object.entries(themes).map(([id, theme]) => (
+                <button
+                  key={id}
+                  onClick={() => {
+                    setCurrentTheme(id)
+                    setThemeOpen(false)
+                  }}
+                  className={`flex items-center gap-2.5 w-full px-2.5 py-1.5 rounded-md text-xs transition-colors ${
+                    currentTheme === id
+                      ? 'bg-accent/15 text-accent-hover font-medium'
+                      : 'text-text-muted hover:text-text hover:bg-surface-2'
+                  }`}
+                >
+                  <div
+                    className="w-3 h-3 rounded-full shrink-0"
+                    style={{ backgroundColor: theme.swatch }}
+                  />
+                  {theme.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        <div className="p-3 border-t border-border flex items-center justify-between">
+          <p className="text-[11px] text-text-muted">Localhost only</p>
+          {onLogout && (
+            <button
+              onClick={onLogout}
+              className="text-[11px] text-text-muted hover:text-red transition-colors"
             >
-              <svg
-                width="8" height="12" viewBox="0 0 8 12" fill="currentColor"
-                className="shrink-0 cursor-grab hidden md:block"
-                style={{ opacity: 0.2 }}
-              >
-                <circle cx="2" cy="2" r="1" />
-                <circle cx="6" cy="2" r="1" />
-                <circle cx="2" cy="6" r="1" />
-                <circle cx="6" cy="6" r="1" />
-                <circle cx="2" cy="10" r="1" />
-                <circle cx="6" cy="10" r="1" />
-              </svg>
-              <Icon />
-              {label}
-            </NavLink>
-          )
-        })}
-      </div>
-      <div className="px-2 pb-2">
-        <button
-          onClick={() => setThemeOpen(!themeOpen)}
-          className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-text-muted hover:text-text hover:bg-surface-3 transition-colors w-full"
-        >
-          <div
-            className="w-4 h-4 rounded-full border border-border"
-            style={{ backgroundColor: themes[currentTheme]?.swatch }}
-          />
-          Theme
-        </button>
-        {themeOpen && (
-          <div className="mt-1 p-2 bg-surface-3 rounded-lg border border-border space-y-1">
-            {Object.entries(themes).map(([id, theme]) => (
-              <button
-                key={id}
-                onClick={() => {
-                  setCurrentTheme(id)
-                  setThemeOpen(false)
-                }}
-                className={`flex items-center gap-2.5 w-full px-2.5 py-1.5 rounded-md text-xs transition-colors ${
-                  currentTheme === id
-                    ? 'bg-accent/15 text-accent-hover font-medium'
-                    : 'text-text-muted hover:text-text hover:bg-surface-2'
-                }`}
-              >
-                <div
-                  className="w-3 h-3 rounded-full shrink-0"
-                  style={{ backgroundColor: theme.swatch }}
-                />
-                {theme.label}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-      <div className="p-3 border-t border-border flex items-center justify-between">
-        <p className="text-[11px] text-text-muted">Localhost only</p>
-        {onLogout && (
-          <button
-            onClick={onLogout}
-            className="text-[11px] text-text-muted hover:text-red transition-colors"
-          >
-            Log out
-          </button>
-        )}
-      </div>
-    </>
-  )
-
-  return (
-    <div className="flex h-screen">
-      <nav className="hidden md:flex w-56 bg-surface-2 border-r border-border flex-col shrink-0">
-        {sidebar}
+              Log out
+            </button>
+          )}
+        </div>
       </nav>
 
-      {mobileOpen && (
-        <div
-          className="fixed inset-0 bg-black/50 z-40 md:hidden"
-          onClick={() => setMobileOpen(false)}
-        />
-      )}
-      <nav
-        className={`fixed inset-y-0 left-0 z-50 w-64 bg-surface-2 border-r border-border flex flex-col transform transition-transform duration-200 md:hidden ${
-          mobileOpen ? 'translate-x-0' : '-translate-x-full'
-        }`}
-      >
-        {sidebar}
-      </nav>
-
+      {/* Main content */}
       <div className="flex-1 flex flex-col min-w-0">
-        <div className="md:hidden flex items-center gap-3 p-3 bg-surface-2 border-b border-border">
-          <button
-            onClick={() => setMobileOpen(true)}
-            className="p-1.5 text-text-muted hover:text-text"
-          >
-            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-              <path d="M3 5h14M3 10h14M3 15h14" />
-            </svg>
-          </button>
+        {/* Mobile top bar */}
+        <div className="md:hidden flex items-center justify-between px-4 py-3 bg-surface-2 border-b border-border">
           <div className="flex items-center gap-2">
             <Logo size={24} />
             <span className="text-sm font-semibold text-text">WhisperWealth</span>
           </div>
+          <button
+            onClick={() => setSettingsOpen(!settingsOpen)}
+            className="p-1.5 text-text-muted hover:text-text"
+          >
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="9" cy="9" r="2.5" />
+              <path d="M9 1.5v2M9 14.5v2M1.5 9h2M14.5 9h2M3.4 3.4l1.4 1.4M13.2 13.2l1.4 1.4M3.4 14.6l1.4-1.4M13.2 4.8l1.4-1.4" />
+            </svg>
+          </button>
         </div>
-        <main className="flex-1 overflow-auto p-4 md:p-6">
+
+        {/* Mobile settings dropdown */}
+        {settingsOpen && (
+          <div className="md:hidden bg-surface-2 border-b border-border px-4 pb-3 space-y-2">
+            <div className="flex gap-2 flex-wrap">
+              {Object.entries(themes).map(([id, theme]) => (
+                <button
+                  key={id}
+                  onClick={() => {
+                    setCurrentTheme(id)
+                    setSettingsOpen(false)
+                  }}
+                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs transition-colors ${
+                    currentTheme === id
+                      ? 'bg-accent/15 text-accent-hover font-medium'
+                      : 'bg-surface-3 text-text-muted'
+                  }`}
+                >
+                  <div
+                    className="w-2.5 h-2.5 rounded-full"
+                    style={{ backgroundColor: theme.swatch }}
+                  />
+                  {theme.label}
+                </button>
+              ))}
+            </div>
+            {onLogout && (
+              <button
+                onClick={onLogout}
+                className="text-xs text-text-muted hover:text-red transition-colors"
+              >
+                Log out
+              </button>
+            )}
+          </div>
+        )}
+
+        <main className="flex-1 overflow-auto p-4 md:p-6 pb-20 md:pb-6">
           <Outlet />
         </main>
+
+        {/* Mobile bottom tab bar */}
+        <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-surface-2 border-t border-border z-40">
+          <div className="flex">
+            {navItems.map(({ to, short, icon }) => {
+              const Icon = ICONS[icon]
+              return (
+                <NavLink
+                  key={to}
+                  to={to}
+                  end={to === '/'}
+                  className={({ isActive }) =>
+                    `flex-1 flex flex-col items-center gap-0.5 py-2.5 text-[10px] transition-colors ${
+                      isActive
+                        ? 'text-accent-hover'
+                        : 'text-text-muted'
+                    }`
+                  }
+                >
+                  <Icon />
+                  {short}
+                </NavLink>
+              )
+            })}
+          </div>
+          <div className="h-[env(safe-area-inset-bottom)]" />
+        </nav>
       </div>
     </div>
   )

@@ -152,6 +152,44 @@ npm start
 
 Open [http://localhost:3000](http://localhost:3000)
 
+## Custom Local Domain
+
+To access WhisperWealth via a custom domain instead of `localhost:3000`:
+
+**Option 1: /etc/hosts (simplest)**
+
+```bash
+# Add to /etc/hosts (Mac/Linux) or C:\Windows\System32\drivers\etc\hosts (Windows)
+127.0.0.1  whisperwealth.local
+```
+
+Then visit `http://whisperwealth.local:3000`
+
+**Option 2: Caddy reverse proxy (HTTPS + port 80)**
+
+```bash
+# Install Caddy, then create a Caddyfile:
+whisperwealth.local {
+  reverse_proxy 127.0.0.1:3000
+  tls internal
+}
+```
+
+Then visit `https://whisperwealth.local`
+
+**Option 3: Tailscale MagicDNS**
+
+If you're running Tailscale, your machine is automatically accessible at `https://your-machine.tail-net-name.ts.net`. Set `CORS_ORIGINS` to include this hostname.
+
+## Mobile App
+
+WhisperWealth is a Progressive Web App (PWA). On your phone:
+
+- **iOS**: Open in Safari → Share → "Add to Home Screen"
+- **Android**: Open in Chrome → Menu → "Add to Home Screen" or "Install app"
+
+This gives you a full-screen app experience with the WhisperWealth icon on your home screen.
+
 ## Configuration
 
 | Environment Variable | Default | Description |

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useApi, postApi, deleteApi } from '../hooks/useApi'
 import { currencySymbol } from '../utils/currency'
 import TickerChart from '../components/TickerChart'
+import StockCard from '../components/StockCard'
 
 const INTERVALS = [
   { label: '10s', value: 10_000 },
@@ -194,118 +195,161 @@ export default function Watchlist() {
           No tickers in your watchlist yet.
         </div>
       ) : (
-        <div className="bg-surface-2 rounded-xl border border-border overflow-x-auto">
-          <table className="w-full text-sm min-w-[800px]">
-            <thead>
-              <tr className="border-b border-border text-text-muted text-xs uppercase tracking-wider">
-                {WL_COLUMNS.map((col) => (
-                  <th
-                    key={col.key}
-                    onClick={() => handleSort(col.key)}
-                    className={`p-3 cursor-pointer select-none hover:text-text transition-colors ${
-                      col.align === 'left' ? 'text-left' : 'text-right'
-                    } ${col.key === 'ticker' ? 'pl-4' : ''}`}
-                  >
-                    <span className="inline-flex items-center gap-1">
-                      {col.label}
-                      {sortKey === col.key && <SortArrow dir={sortDir} />}
-                    </span>
-                  </th>
-                ))}
-                <th className="p-3 pr-4"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {sortedItems.map((item) => {
-                const q = item.quote
-                const pc = item.periodChanges
-                const isExpanded = expandedTicker === item.ticker
-
-                if (!q) {
-                  return (
-                    <tr key={item.id} className="border-b border-border/30">
-                      <td className="p-3 pl-4 font-medium">{item.ticker}</td>
-                      <td className="p-3 text-text-muted text-xs" colSpan={6}>
-                        Loading...
-                      </td>
-                      <td />
-                      <td className="p-3 pr-4 text-right">
-                        <button
-                          onClick={() => handleDelete(item.id)}
-                          className="text-text-muted hover:text-red transition-colors p-1"
-                        >
-                          <TrashIcon />
-                        </button>
-                      </td>
-                    </tr>
-                  )
-                }
-
-                const up = q.change >= 0
-                const sym = currencySymbol(q.currency)
-
+        <>
+          {/* Mobile: card view */}
+          <div className="md:hidden space-y-2">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-xs text-text-muted">Sort:</span>
+              <select
+                value={sortKey || ''}
+                onChange={(e) => {
+                  const key = e.target.value || null
+                  setSortKey(key)
+                  setSortDir(key === 'ticker' || key === 'name' ? 'asc' : 'desc')
+                }}
+                className="bg-surface-3 border border-border rounded-lg px-2 py-1.5 text-xs text-text outline-none"
+              >
+                <option value="">Default</option>
+                <option value="change_percent">Day Change</option>
+                <option value="3m">3M Change</option>
+                <option value="6m">6M Change</option>
+                <option value="1y">1Y Change</option>
+                <option value="price">Price</option>
+                <option value="ticker">Ticker</option>
+              </select>
+            </div>
+            {sortedItems.map((item) => {
+              const q = item.quote
+              const isExpanded = expandedTicker === item.ticker
+              if (!q) {
                 return (
-                  <>
-                    <tr
-                      key={item.id}
+                  <div key={item.id} className="bg-surface-2 border border-border rounded-xl p-3.5 flex items-center justify-between">
+                    <span className="text-sm font-medium">{item.ticker}</span>
+                    <span className="text-xs text-text-muted">Loading...</span>
+                  </div>
+                )
+              }
+              return (
+                <div key={item.id}>
+                  <div className="relative">
+                    <StockCard
+                      item={{ ...q, periodChanges: item.periodChanges }}
+                      variant="watchlist"
                       onClick={() => setExpandedTicker(isExpanded ? null : item.ticker)}
-                      className={`border-b border-border/30 cursor-pointer transition-colors ${
-                        isExpanded ? 'bg-surface-3/40' : 'hover:bg-surface-3/40'
-                      }`}
+                    />
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleDelete(item.id) }}
+                      className="absolute top-3 right-3 text-text-muted hover:text-red transition-colors p-1"
                     >
-                      <td className="p-3 pl-4">
-                        <div className="flex items-center gap-2.5">
-                          <div className={`w-1.5 h-6 rounded-full ${up ? 'bg-green' : 'bg-red'}`} />
-                          <div>
-                            <div className="font-medium">{q.ticker}</div>
-                            <div className="text-[10px] text-text-muted">{q.currency}</div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="p-3 text-text-muted text-xs truncate max-w-[150px]">
-                        {q.name}
-                      </td>
-                      <td className="text-right p-3 tabular-nums font-medium">
-                        {sym}{q.price.toFixed(2)}
-                      </td>
-                      <td className="text-right p-3">
-                        <PctBadge value={q.change_percent} />
-                      </td>
-                      <td className="text-right p-3">
-                        <PctBadge value={pc?.['3m']} />
-                      </td>
-                      <td className="text-right p-3">
-                        <PctBadge value={pc?.['6m']} />
-                      </td>
-                      <td className="text-right p-3">
-                        <PctBadge value={pc?.['1y']} />
-                      </td>
-                      <td className="text-right p-3 tabular-nums text-text-muted">
-                        {q.dividend_yield > 0 ? `${q.dividend_yield.toFixed(2)}%` : '—'}
-                      </td>
-                      <td className="text-right p-3 pr-4">
-                        <button
-                          onClick={(e) => { e.stopPropagation(); handleDelete(item.id) }}
-                          className="text-text-muted hover:text-red transition-colors p-1"
-                          title="Remove from watchlist"
-                        >
-                          <TrashIcon />
-                        </button>
-                      </td>
-                    </tr>
-                    {isExpanded && (
-                      <tr key={`${item.id}-chart`}>
-                        <td colSpan={9} className="p-0">
-                          <TickerChart ticker={item.ticker} currency={q.currency} />
+                      <TrashIcon />
+                    </button>
+                  </div>
+                  {isExpanded && (
+                    <div className="mt-1 rounded-xl border border-border overflow-hidden">
+                      <TickerChart ticker={item.ticker} currency={q.currency} />
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+
+          {/* Desktop: table view */}
+          <div className="hidden md:block bg-surface-2 rounded-xl border border-border overflow-x-auto">
+            <table className="w-full text-sm min-w-[800px]">
+              <thead>
+                <tr className="border-b border-border text-text-muted text-xs uppercase tracking-wider">
+                  {WL_COLUMNS.map((col) => (
+                    <th
+                      key={col.key}
+                      onClick={() => handleSort(col.key)}
+                      className={`p-3 cursor-pointer select-none hover:text-text transition-colors ${
+                        col.align === 'left' ? 'text-left' : 'text-right'
+                      } ${col.key === 'ticker' ? 'pl-4' : ''}`}
+                    >
+                      <span className="inline-flex items-center gap-1">
+                        {col.label}
+                        {sortKey === col.key && <SortArrow dir={sortDir} />}
+                      </span>
+                    </th>
+                  ))}
+                  <th className="p-3 pr-4"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {sortedItems.map((item) => {
+                  const q = item.quote
+                  const pc = item.periodChanges
+                  const isExpanded = expandedTicker === item.ticker
+
+                  if (!q) {
+                    return (
+                      <tr key={item.id} className="border-b border-border/30">
+                        <td className="p-3 pl-4 font-medium">{item.ticker}</td>
+                        <td className="p-3 text-text-muted text-xs" colSpan={6}>Loading...</td>
+                        <td />
+                        <td className="p-3 pr-4 text-right">
+                          <button onClick={() => handleDelete(item.id)} className="text-text-muted hover:text-red transition-colors p-1">
+                            <TrashIcon />
+                          </button>
                         </td>
                       </tr>
-                    )}
-                  </>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
+                    )
+                  }
+
+                  const up = q.change >= 0
+                  const sym = currencySymbol(q.currency)
+
+                  return (
+                    <>
+                      <tr
+                        key={item.id}
+                        onClick={() => setExpandedTicker(isExpanded ? null : item.ticker)}
+                        className={`border-b border-border/30 cursor-pointer transition-colors ${
+                          isExpanded ? 'bg-surface-3/40' : 'hover:bg-surface-3/40'
+                        }`}
+                      >
+                        <td className="p-3 pl-4">
+                          <div className="flex items-center gap-2.5">
+                            <div className={`w-1.5 h-6 rounded-full ${up ? 'bg-green' : 'bg-red'}`} />
+                            <div>
+                              <div className="font-medium">{q.ticker}</div>
+                              <div className="text-[10px] text-text-muted">{q.currency}</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="p-3 text-text-muted text-xs truncate max-w-[150px]">{q.name}</td>
+                        <td className="text-right p-3 tabular-nums font-medium">{sym}{q.price.toFixed(2)}</td>
+                        <td className="text-right p-3"><PctBadge value={q.change_percent} /></td>
+                        <td className="text-right p-3"><PctBadge value={pc?.['3m']} /></td>
+                        <td className="text-right p-3"><PctBadge value={pc?.['6m']} /></td>
+                        <td className="text-right p-3"><PctBadge value={pc?.['1y']} /></td>
+                        <td className="text-right p-3 tabular-nums text-text-muted">
+                          {q.dividend_yield > 0 ? `${q.dividend_yield.toFixed(2)}%` : '—'}
+                        </td>
+                        <td className="text-right p-3 pr-4">
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleDelete(item.id) }}
+                            className="text-text-muted hover:text-red transition-colors p-1"
+                          >
+                            <TrashIcon />
+                          </button>
+                        </td>
+                      </tr>
+                      {isExpanded && (
+                        <tr key={`${item.id}-chart`}>
+                          <td colSpan={9} className="p-0">
+                            <TickerChart ticker={item.ticker} currency={q.currency} />
+                          </td>
+                        </tr>
+                      )}
+                    </>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
     </div>
   )
