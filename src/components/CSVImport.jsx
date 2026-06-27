@@ -52,30 +52,35 @@ export default function CSVImport({ onImported }) {
       setFileType('pdf')
       setLoading(true)
       try {
-        const arrayBuffer = await file.arrayBuffer()
-        const bytes = new Uint8Array(arrayBuffer)
-        let binary = ''
-        for (let i = 0; i < bytes.length; i++) {
-          binary += String.fromCharCode(bytes[i])
-        }
-        const base64 = btoa(binary)
+        const base64 = await new Promise((resolve, reject) => {
+          const reader = new FileReader()
+          reader.onload = () => {
+            const result = reader.result
+            const base64String = result.split(',')[1]
+            resolve(base64String)
+          }
+          reader.onerror = () => reject(new Error('Failed to read PDF file'))
+          reader.readAsDataURL(file)
+        })
+
         const data = await postApi('/api/transactions/import/parse-pdf', { pdf: base64 })
         if (!data) {
-          setError('No response from server')
+          setError('No response from server. Check your auth token.')
+          setStep('upload')
         } else if (data.error) {
           setError(data.error)
-        } else if (!data.transactions?.length) {
-          setPreview(data)
-          setPdfRawText(data.rawText)
-          setError('No transactions found in PDF. Check the extracted text below.')
-          setStep('preview')
+          setStep('upload')
         } else {
-          setPreview(data)
+          setPreview({ ...data, skipped: data.skipped || [] })
           setPdfRawText(data.rawText)
+          if (!data.transactions?.length) {
+            setError('No transactions found in PDF. Check the extracted text below.')
+          }
           setStep('preview')
         }
       } catch (err) {
         setError(err?.message || 'Failed to process PDF')
+        setStep('upload')
       } finally {
         setLoading(false)
       }
