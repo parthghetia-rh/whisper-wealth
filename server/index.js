@@ -29,16 +29,16 @@ const allowedOrigins = process.env.CORS_ORIGINS
     ]
 
 app.use(cors({ origin: allowedOrigins }))
-app.use(express.json({ limit: '100kb' }))
 
 const apiLimiter = rateLimit({ windowMs: 60_000, max: 120 })
 const refreshLimiter = rateLimit({ windowMs: 60_000, max: 3 })
 const importLimiter = rateLimit({ windowMs: 60_000, max: 5 })
 
+app.use('/api/transactions/import', express.json({ limit: '10mb' }), importLimiter)
+app.use(express.json({ limit: '100kb' }))
+
 app.use('/api', apiLimiter)
 app.use('/api', authMiddleware)
-
-app.use('/api/transactions/import', importLimiter)
 app.use('/api/transactions', transactionsRouter)
 app.use('/api/portfolio/refresh', refreshLimiter)
 app.use('/api/portfolio/quick-refresh', refreshLimiter)
