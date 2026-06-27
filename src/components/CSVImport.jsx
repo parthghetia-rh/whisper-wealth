@@ -53,36 +53,53 @@ export default function CSVImport({ onImported }) {
       setLoading(true)
       try {
         const arrayBuffer = await file.arrayBuffer()
-        const base64 = btoa(
-          new Uint8Array(arrayBuffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
-        )
+        const bytes = new Uint8Array(arrayBuffer)
+        let binary = ''
+        for (let i = 0; i < bytes.length; i++) {
+          binary += String.fromCharCode(bytes[i])
+        }
+        const base64 = btoa(binary)
         const data = await postApi('/api/transactions/import/parse-pdf', { pdf: base64 })
-        if (data.error) {
+        if (!data) {
+          setError('No response from server')
+        } else if (data.error) {
           setError(data.error)
+        } else if (!data.transactions?.length) {
+          setPreview(data)
+          setPdfRawText(data.rawText)
+          setError('No transactions found in PDF. Check the extracted text below.')
+          setStep('preview')
         } else {
           setPreview(data)
           setPdfRawText(data.rawText)
           setStep('preview')
         }
       } catch (err) {
-        setError(err.message)
+        setError(err?.message || 'Failed to process PDF')
       } finally {
         setLoading(false)
       }
     } else {
       setFileType('csv')
+      setLoading(true)
       const text = await file.text()
       setCsvText(text)
       try {
         const data = await postApi('/api/transactions/import/parse', { csv: text })
-        setHeaders(data.headers)
-        setSample(data.sample)
-        setRowCount(data.rowCount)
-        setDelimiter(data.delimiter)
-        setMapping({})
-        setStep('map')
+        if (!data) {
+          setError('No response from server')
+        } else {
+          setHeaders(data.headers)
+          setSample(data.sample)
+          setRowCount(data.rowCount)
+          setDelimiter(data.delimiter)
+          setMapping({})
+          setStep('map')
+        }
       } catch (err) {
-        setError(err.message)
+        setError(err?.message || 'Failed to parse file')
+      } finally {
+        setLoading(false)
       }
     }
   }
@@ -191,9 +208,14 @@ export default function CSVImport({ onImported }) {
         <div className="text-red text-xs bg-red/10 rounded-lg px-3 py-2">{error}</div>
       )}
 
-      {step === 'upload' && loading && (
-        <div className="border-2 border-dashed border-accent/50 rounded-lg px-6 py-8 text-center bg-accent/5">
-          <p className="text-sm text-accent">Extracting text from PDF...</p>
+      {loading && (
+        <div className="border-2 border-dashed border-accent/50 rounded-lg px-6 py-10 text-center bg-accent/5">
+          <svg className="animate-spin mx-auto mb-3 text-accent" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <path d="M12 2a10 10 0 0 1 10 10" />
+          </svg>
+          <p className="text-sm text-accent">
+            {fileType === 'pdf' ? 'Extracting text from PDF...' : 'Parsing file...'}
+          </p>
           <p className="text-xs text-text-muted mt-1">{fileName}</p>
         </div>
       )}
@@ -454,8 +476,13 @@ export default function CSVImport({ onImported }) {
             <button
               onClick={handleImport}
               disabled={loading || !preview.transactions.length}
-              className="px-4 py-2 bg-accent hover:bg-accent-hover text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+              className="flex items-center gap-2 px-4 py-2 bg-accent hover:bg-accent-hover text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
             >
+              {loading && (
+                <svg className="animate-spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                  <path d="M12 2a10 10 0 0 1 10 10" />
+                </svg>
+              )}
               {loading ? 'Importing...' : `Import ${preview.transactions.length} Transaction${preview.transactions.length !== 1 ? 's' : ''}`}
             </button>
             <button
