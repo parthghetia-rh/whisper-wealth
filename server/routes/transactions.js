@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { stmtAll, stmtGet, stmtRun, stmtRunBatch, save } from '../db.js'
 import { triggerPoll } from '../services/poller.js'
 import { parseHeaders, importWithMapping } from '../services/csvParser.js'
+import { parsePDF } from '../services/pdfParser.js'
 
 const router = Router()
 const TICKER_RE = /^[A-Z0-9.\-]{1,20}$/
@@ -107,6 +108,24 @@ router.delete('/:id', (req, res) => {
     return res.status(404).json({ error: 'Transaction not found' })
   }
   res.json({ success: true })
+})
+
+router.post('/import/parse-pdf', async (req, res) => {
+  const { pdf } = req.body
+  if (!pdf || typeof pdf !== 'string') {
+    return res.status(400).json({ error: 'PDF data is required (base64)' })
+  }
+  try {
+    const buffer = Buffer.from(pdf, 'base64')
+    const result = await parsePDF(buffer)
+    if (result.error) {
+      return res.status(400).json({ error: result.error })
+    }
+    res.json(result)
+  } catch (err) {
+    console.error('PDF parse failed:', err.message)
+    res.status(400).json({ error: 'Failed to parse PDF. Ensure it contains selectable text.' })
+  }
 })
 
 router.post('/import/parse', (req, res) => {

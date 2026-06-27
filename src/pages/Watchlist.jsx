@@ -235,11 +235,12 @@ export default function Watchlist() {
                     <StockCard
                       item={{ ...q, periodChanges: item.periodChanges }}
                       variant="watchlist"
+                      hasAction
                       onClick={() => setExpandedTicker(isExpanded ? null : item.ticker)}
                     />
                     <button
                       onClick={(e) => { e.stopPropagation(); handleDelete(item.id) }}
-                      className="absolute top-3 right-3 text-text-muted hover:text-red transition-colors p-1"
+                      className="absolute top-1/2 -translate-y-1/2 right-3 text-text-muted hover:text-red transition-colors p-2"
                     >
                       <TrashIcon />
                     </button>

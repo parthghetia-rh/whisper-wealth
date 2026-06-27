@@ -1,6 +1,6 @@
 import { currencySymbol } from '../utils/currency'
 
-export default function StockCard({ item, onClick, variant = 'holding' }) {
+export default function StockCard({ item, onClick, variant = 'holding', hasAction }) {
   const isHolding = variant === 'holding'
   const sym = currencySymbol(item.currency || 'USD')
   const up = (item.change ?? item.change_percent ?? 0) >= 0
@@ -10,7 +10,7 @@ export default function StockCard({ item, onClick, variant = 'holding' }) {
       onClick={onClick}
       className={`bg-surface-2 border border-border rounded-xl p-3.5 flex items-center gap-3 ${
         onClick ? 'cursor-pointer active:bg-surface-3/60' : ''
-      }`}
+      } ${hasAction ? 'pr-10' : ''}`}
     >
       <div className={`w-1 h-10 rounded-full shrink-0 ${up ? 'bg-green' : 'bg-red'}`} />
 

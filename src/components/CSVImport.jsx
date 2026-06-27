@@ -6,6 +6,7 @@ const NONE = ''
 export default function CSVImport({ onImported }) {
   const [open, setOpen] = useState(false)
   const [step, setStep] = useState('upload')
+  const [fileType, setFileType] = useState(null)
   const [csvText, setCsvText] = useState('')
   const [fileName, setFileName] = useState(null)
   const [headers, setHeaders] = useState([])
@@ -15,6 +16,7 @@ export default function CSVImport({ onImported }) {
   const [mode, setMode] = useState('transactions')
   const [mapping, setMapping] = useState({})
   const [preview, setPreview] = useState(null)
+  const [pdfRawText, setPdfRawText] = useState(null)
   const [result, setResult] = useState(null)
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -23,12 +25,14 @@ export default function CSVImport({ onImported }) {
 
   const reset = () => {
     setStep('upload')
+    setFileType(null)
     setCsvText('')
     setFileName(null)
     setHeaders([])
     setSample([])
     setMapping({})
     setPreview(null)
+    setPdfRawText(null)
     setResult(null)
     setError(null)
     setMode('transactions')
@@ -40,20 +44,46 @@ export default function CSVImport({ onImported }) {
     setError(null)
     setResult(null)
     setPreview(null)
+    setPdfRawText(null)
 
-    const text = await file.text()
-    setCsvText(text)
+    const isPdf = file.name.toLowerCase().endsWith('.pdf') || file.type === 'application/pdf'
 
-    try {
-      const data = await postApi('/api/transactions/import/parse', { csv: text })
-      setHeaders(data.headers)
-      setSample(data.sample)
-      setRowCount(data.rowCount)
-      setDelimiter(data.delimiter)
-      setMapping({})
-      setStep('map')
-    } catch (err) {
-      setError(err.message)
+    if (isPdf) {
+      setFileType('pdf')
+      setLoading(true)
+      try {
+        const arrayBuffer = await file.arrayBuffer()
+        const base64 = btoa(
+          new Uint8Array(arrayBuffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
+        )
+        const data = await postApi('/api/transactions/import/parse-pdf', { pdf: base64 })
+        if (data.error) {
+          setError(data.error)
+        } else {
+          setPreview(data)
+          setPdfRawText(data.rawText)
+          setStep('preview')
+        }
+      } catch (err) {
+        setError(err.message)
+      } finally {
+        setLoading(false)
+      }
+    } else {
+      setFileType('csv')
+      const text = await file.text()
+      setCsvText(text)
+      try {
+        const data = await postApi('/api/transactions/import/parse', { csv: text })
+        setHeaders(data.headers)
+        setSample(data.sample)
+        setRowCount(data.rowCount)
+        setDelimiter(data.delimiter)
+        setMapping({})
+        setStep('map')
+      } catch (err) {
+        setError(err.message)
+      }
     }
   }
 
@@ -90,12 +120,29 @@ export default function CSVImport({ onImported }) {
     setLoading(true)
     setError(null)
     try {
-      const fullMapping = { ...mapping, mode }
-      const data = await postApi('/api/transactions/import', {
-        csv: csvText,
-        mapping: fullMapping,
-      })
-      setResult(data)
+      if (fileType === 'pdf') {
+        const rows = preview.transactions.map(
+          (t) => `${t.date},${t.type},${t.ticker},${t.shares},${t.price_per_share}`
+        )
+        const csv = `Date,Type,Symbol,Quantity,Price\n${rows.join('\n')}`
+        const mapping = {
+          mode: 'transactions',
+          dateCol: 'Date',
+          typeCol: 'Type',
+          tickerCol: 'Symbol',
+          sharesCol: 'Quantity',
+          priceCol: 'Price',
+        }
+        const data = await postApi('/api/transactions/import', { csv, mapping })
+        setResult(data)
+      } else {
+        const fullMapping = { ...mapping, mode }
+        const data = await postApi('/api/transactions/import', {
+          csv: csvText,
+          mapping: fullMapping,
+        })
+        setResult(data)
+      }
       setStep('done')
       onImported?.()
     } catch (err) {
@@ -121,7 +168,7 @@ export default function CSVImport({ onImported }) {
         <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
           <path d="M7 1v8M4 5l3-3 3 3M2 10v2h10v-2" />
         </svg>
-        Import CSV / TSV
+        Import File
       </button>
     )
   }
@@ -144,7 +191,14 @@ export default function CSVImport({ onImported }) {
         <div className="text-red text-xs bg-red/10 rounded-lg px-3 py-2">{error}</div>
       )}
 
-      {step === 'upload' && (
+      {step === 'upload' && loading && (
+        <div className="border-2 border-dashed border-accent/50 rounded-lg px-6 py-8 text-center bg-accent/5">
+          <p className="text-sm text-accent">Extracting text from PDF...</p>
+          <p className="text-xs text-text-muted mt-1">{fileName}</p>
+        </div>
+      )}
+
+      {step === 'upload' && !loading && (
         <div
           onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
           onDragLeave={() => setDragOver(false)}
@@ -157,15 +211,15 @@ export default function CSVImport({ onImported }) {
           <input
             ref={fileRef}
             type="file"
-            accept=".csv,.tsv,.txt"
+            accept=".csv,.tsv,.txt,.pdf"
             className="hidden"
             onChange={(e) => handleFile(e.target.files[0])}
           />
           <p className="text-sm text-text-muted">
-            Drop any CSV or TSV file here, or click to browse
+            Drop a CSV, TSV, or PDF file here, or click to browse
           </p>
           <p className="text-xs text-text-muted/60 mt-1">
-            Works with Wealthsimple, Questrade, or any broker export
+            CSV/TSV: broker exports with column mapping. PDF: printed broker confirmation emails.
           </p>
         </div>
       )}
@@ -321,11 +375,29 @@ export default function CSVImport({ onImported }) {
 
       {step === 'preview' && preview && (
         <div className="space-y-3">
-          <div className="flex items-center gap-4 text-xs text-text-muted">
+          <div className="flex items-center gap-4 text-xs text-text-muted flex-wrap">
             <span>Valid: <span className="text-green font-medium">{preview.transactions.length}</span></span>
-            <span>Skipped: <span className="text-text-muted font-medium">{preview.skipped.length}</span></span>
-            <span className="bg-surface-3 px-2 py-0.5 rounded">{mode === 'holdings' ? 'Holdings import' : 'Transaction import'}</span>
+            <span>Skipped: <span className="text-text-muted font-medium">{preview.skipped?.length || 0}</span></span>
+            <span className="bg-surface-3 px-2 py-0.5 rounded">
+              {fileType === 'pdf' ? 'PDF import' : mode === 'holdings' ? 'Holdings import' : 'Transaction import'}
+            </span>
+            {fileType === 'pdf' && preview.patternsMatched?.length > 0 && (
+              <span className="text-accent">
+                Matched: {preview.patternsMatched.join(', ')}
+              </span>
+            )}
           </div>
+
+          {fileType === 'pdf' && pdfRawText && (
+            <details className="text-xs">
+              <summary className="text-text-muted cursor-pointer hover:text-text">
+                Extracted text preview
+              </summary>
+              <pre className="mt-2 p-3 bg-surface-3 rounded-lg border border-border text-[11px] text-text-muted whitespace-pre-wrap max-h-40 overflow-y-auto">
+                {pdfRawText}
+              </pre>
+            </details>
+          )}
 
           {preview.transactions.length > 0 && (
             <div className="bg-surface-3 rounded-lg border border-border overflow-x-auto">
@@ -387,10 +459,10 @@ export default function CSVImport({ onImported }) {
               {loading ? 'Importing...' : `Import ${preview.transactions.length} Transaction${preview.transactions.length !== 1 ? 's' : ''}`}
             </button>
             <button
-              onClick={() => setStep('map')}
+              onClick={() => fileType === 'pdf' ? reset() : setStep('map')}
               className="px-4 py-2 bg-surface-3 border border-border rounded-lg text-sm text-text-muted hover:text-text transition-colors"
             >
-              Back to mapping
+              {fileType === 'pdf' ? 'Start over' : 'Back to mapping'}
             </button>
           </div>
         </div>

@@ -19,6 +19,7 @@ const ICONS = {
 }
 
 const NAV_ORDER_KEY = 'folio-nav-order'
+const SIDEBAR_KEY = 'folio-sidebar-collapsed'
 
 function getStoredOrder() {
   try {
@@ -46,6 +47,7 @@ export default function Layout({ onLogout }) {
   const [currentTheme, setCurrentTheme] = useState(getStoredTheme)
   const [themeOpen, setThemeOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [collapsed, setCollapsed] = useState(() => localStorage.getItem(SIDEBAR_KEY) === 'true')
   const [navItems, setNavItems] = useState(getOrderedNav)
   const [dragIdx, setDragIdx] = useState(null)
   const [overIdx, setOverIdx] = useState(null)
@@ -60,7 +62,15 @@ export default function Layout({ onLogout }) {
     setSettingsOpen(false)
   }, [location.pathname])
 
+  const toggleCollapse = () => {
+    const next = !collapsed
+    setCollapsed(next)
+    localStorage.setItem(SIDEBAR_KEY, String(next))
+    if (next) setThemeOpen(false)
+  }
+
   const handleDragStart = (e, idx) => {
+    if (collapsed) return
     setDragIdx(idx)
     dragNode.current = e.target
     e.dataTransfer.effectAllowed = 'move'
@@ -92,20 +102,29 @@ export default function Layout({ onLogout }) {
   return (
     <div className="flex h-screen">
       {/* Desktop sidebar */}
-      <nav className="hidden md:flex w-56 bg-surface-2 border-r border-border flex-col shrink-0">
-        <div className="p-5 border-b border-border">
-          <div className="flex items-center gap-3">
-            <Logo />
-            <div>
-              <h1 className="text-[15px] font-semibold tracking-tight text-text leading-tight">
-                WhisperWealth
-              </h1>
-              <p className="text-[9px] text-text-muted tracking-wide">
-                Private financial dashboard
-              </p>
+      <nav
+        className={`hidden md:flex bg-surface-2 border-r border-border flex-col shrink-0 transition-all duration-200 ${
+          collapsed ? 'w-16' : 'w-56'
+        }`}
+      >
+        <div className={`border-b border-border ${collapsed ? 'p-3 flex justify-center' : 'p-5'}`}>
+          {collapsed ? (
+            <Logo size={28} />
+          ) : (
+            <div className="flex items-center gap-3">
+              <Logo />
+              <div>
+                <h1 className="text-[15px] font-semibold tracking-tight text-text leading-tight">
+                  WhisperWealth
+                </h1>
+                <p className="text-[9px] text-text-muted tracking-wide">
+                  Private financial dashboard
+                </p>
+              </div>
             </div>
-          </div>
+          )}
         </div>
+
         <div className="flex-1 py-3 px-2 space-y-0.5 overflow-y-auto">
           {navItems.map(({ to, label, icon }, idx) => {
             const Icon = ICONS[icon]
@@ -114,54 +133,102 @@ export default function Layout({ onLogout }) {
                 key={to}
                 to={to}
                 end={to === '/'}
-                draggable
+                draggable={!collapsed}
                 onDragStart={(e) => handleDragStart(e, idx)}
                 onDragOver={(e) => handleDragOver(e, idx)}
                 onDrop={(e) => handleDrop(e, idx)}
                 onDragEnd={handleDragEnd}
+                title={collapsed ? label : undefined}
                 className={({ isActive }) =>
-                  `flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors select-none ${
+                  `flex items-center rounded-lg text-sm transition-colors select-none ${
+                    collapsed ? 'justify-center p-2.5' : 'gap-2.5 px-3 py-2'
+                  } ${
                     isActive
                       ? 'bg-accent/15 text-accent-hover font-medium'
                       : 'text-text-muted hover:text-text hover:bg-surface-3'
                   } ${dragIdx === idx ? 'opacity-40' : ''} ${
-                    overIdx === idx && dragIdx !== idx
-                      ? 'border-t-2 border-accent'
-                      : ''
+                    overIdx === idx && dragIdx !== idx ? 'border-t-2 border-accent' : ''
                   }`
                 }
               >
-                <svg
-                  width="8" height="12" viewBox="0 0 8 12" fill="currentColor"
-                  className="shrink-0 cursor-grab"
-                  style={{ opacity: 0.2 }}
-                >
-                  <circle cx="2" cy="2" r="1" />
-                  <circle cx="6" cy="2" r="1" />
-                  <circle cx="2" cy="6" r="1" />
-                  <circle cx="6" cy="6" r="1" />
-                  <circle cx="2" cy="10" r="1" />
-                  <circle cx="6" cy="10" r="1" />
-                </svg>
+                {!collapsed && (
+                  <svg
+                    width="8" height="12" viewBox="0 0 8 12" fill="currentColor"
+                    className="shrink-0 cursor-grab"
+                    style={{ opacity: 0.2 }}
+                  >
+                    <circle cx="2" cy="2" r="1" />
+                    <circle cx="6" cy="2" r="1" />
+                    <circle cx="2" cy="6" r="1" />
+                    <circle cx="6" cy="6" r="1" />
+                    <circle cx="2" cy="10" r="1" />
+                    <circle cx="6" cy="10" r="1" />
+                  </svg>
+                )}
                 <Icon />
-                {label}
+                {!collapsed && label}
               </NavLink>
             )
           })}
         </div>
-        <div className="px-2 pb-2">
-          <button
-            onClick={() => setThemeOpen(!themeOpen)}
-            className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-text-muted hover:text-text hover:bg-surface-3 transition-colors w-full"
-          >
-            <div
-              className="w-4 h-4 rounded-full border border-border"
-              style={{ backgroundColor: themes[currentTheme]?.swatch }}
-            />
-            Theme
-          </button>
-          {themeOpen && (
-            <div className="mt-1 p-2 bg-surface-3 rounded-lg border border-border space-y-1">
+
+        {!collapsed && (
+          <div className="px-2 pb-2">
+            <button
+              onClick={() => setThemeOpen(!themeOpen)}
+              className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-text-muted hover:text-text hover:bg-surface-3 transition-colors w-full"
+            >
+              <div
+                className="w-4 h-4 rounded-full border border-border"
+                style={{ backgroundColor: themes[currentTheme]?.swatch }}
+              />
+              Theme
+            </button>
+            {themeOpen && (
+              <div className="mt-1 p-2 bg-surface-3 rounded-lg border border-border space-y-1">
+                {Object.entries(themes).map(([id, theme]) => (
+                  <button
+                    key={id}
+                    onClick={() => {
+                      setCurrentTheme(id)
+                      setThemeOpen(false)
+                    }}
+                    className={`flex items-center gap-2.5 w-full px-2.5 py-1.5 rounded-md text-xs transition-colors ${
+                      currentTheme === id
+                        ? 'bg-accent/15 text-accent-hover font-medium'
+                        : 'text-text-muted hover:text-text hover:bg-surface-2'
+                    }`}
+                  >
+                    <div
+                      className="w-3 h-3 rounded-full shrink-0"
+                      style={{ backgroundColor: theme.swatch }}
+                    />
+                    {theme.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {collapsed && (
+          <div className="px-2 pb-2 flex justify-center">
+            <button
+              onClick={() => setThemeOpen(!themeOpen)}
+              className="p-2.5 rounded-lg text-text-muted hover:text-text hover:bg-surface-3 transition-colors"
+              title="Theme"
+            >
+              <div
+                className="w-4 h-4 rounded-full border border-border"
+                style={{ backgroundColor: themes[currentTheme]?.swatch }}
+              />
+            </button>
+          </div>
+        )}
+
+        {collapsed && themeOpen && (
+          <div className="px-2 pb-2">
+            <div className="p-1.5 bg-surface-3 rounded-lg border border-border space-y-0.5">
               {Object.entries(themes).map(([id, theme]) => (
                 <button
                   key={id}
@@ -169,32 +236,63 @@ export default function Layout({ onLogout }) {
                     setCurrentTheme(id)
                     setThemeOpen(false)
                   }}
-                  className={`flex items-center gap-2.5 w-full px-2.5 py-1.5 rounded-md text-xs transition-colors ${
+                  className={`flex justify-center w-full p-1.5 rounded-md transition-colors ${
                     currentTheme === id
-                      ? 'bg-accent/15 text-accent-hover font-medium'
-                      : 'text-text-muted hover:text-text hover:bg-surface-2'
+                      ? 'bg-accent/15'
+                      : 'hover:bg-surface-2'
                   }`}
+                  title={theme.label}
                 >
                   <div
-                    className="w-3 h-3 rounded-full shrink-0"
+                    className="w-3.5 h-3.5 rounded-full"
                     style={{ backgroundColor: theme.swatch }}
                   />
-                  {theme.label}
                 </button>
               ))}
             </div>
-          )}
-        </div>
-        <div className="p-3 border-t border-border flex items-center justify-between">
-          <p className="text-[11px] text-text-muted">Localhost only</p>
-          {onLogout && (
+          </div>
+        )}
+
+        <div className={`border-t border-border ${collapsed ? 'p-2' : 'p-3'}`}>
+          <div className={`flex items-center ${collapsed ? 'flex-col gap-2' : 'justify-between'}`}>
             <button
-              onClick={onLogout}
-              className="text-[11px] text-text-muted hover:text-red transition-colors"
+              onClick={toggleCollapse}
+              className="p-1.5 rounded-lg text-text-muted hover:text-text hover:bg-surface-3 transition-colors"
+              title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
             >
-              Log out
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                {collapsed ? (
+                  <path d="M5 3l4 4-4 4" />
+                ) : (
+                  <path d="M9 3l-4 4 4 4" />
+                )}
+              </svg>
             </button>
-          )}
+            {!collapsed && (
+              <>
+                <p className="text-[11px] text-text-muted">Localhost only</p>
+                {onLogout && (
+                  <button
+                    onClick={onLogout}
+                    className="text-[11px] text-text-muted hover:text-red transition-colors"
+                  >
+                    Log out
+                  </button>
+                )}
+              </>
+            )}
+            {collapsed && onLogout && (
+              <button
+                onClick={onLogout}
+                className="p-1.5 rounded-lg text-text-muted hover:text-red hover:bg-surface-3 transition-colors"
+                title="Log out"
+              >
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M9 1.5H11.5V12.5H9M5 4L1.5 7L5 10M1.5 7H9.5" />
+                </svg>
+              </button>
+            )}
+          </div>
         </div>
       </nav>
 
@@ -269,9 +367,7 @@ export default function Layout({ onLogout }) {
                   end={to === '/'}
                   className={({ isActive }) =>
                     `flex-1 flex flex-col items-center gap-0.5 py-2.5 text-[10px] transition-colors ${
-                      isActive
-                        ? 'text-accent-hover'
-                        : 'text-text-muted'
+                      isActive ? 'text-accent-hover' : 'text-text-muted'
                     }`
                   }
                 >
