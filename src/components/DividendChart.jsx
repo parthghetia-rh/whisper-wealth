@@ -1,3 +1,4 @@
+import { useNavigate } from 'react-router-dom'
 import {
   BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, Cell,
 } from 'recharts'
@@ -9,6 +10,8 @@ const COLORS = [
 ]
 
 export function DividendComparisonChart({ holdings }) {
+  const navigate = useNavigate()
+
   if (!holdings?.length) return null
 
   const data = holdings
@@ -36,7 +39,11 @@ export function DividendComparisonChart({ holdings }) {
               const maxIncome = data[0].income
               const pct = maxIncome > 0 ? (d.income / maxIncome) * 100 : 0
               return (
-                <div key={d.ticker} className="flex items-center gap-3">
+                <div
+                  key={d.ticker}
+                  className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"
+                  onClick={() => navigate(`/watchlist?ticker=${d.ticker}`)}
+                >
                   <span className="text-xs font-medium w-16 shrink-0">
                     {d.ticker}
                   </span>
@@ -87,7 +94,13 @@ export function DividendComparisonChart({ holdings }) {
                 content={<YieldTooltip />}
                 cursor={{ fill: 'rgba(255,255,255,0.03)' }}
               />
-              <Bar dataKey="yield" radius={[0, 4, 4, 0]} barSize={20}>
+              <Bar
+                dataKey="yield"
+                radius={[0, 4, 4, 0]}
+                barSize={20}
+                className="cursor-pointer"
+                onClick={(entry) => navigate(`/watchlist?ticker=${entry.ticker}`)}
+              >
                 {data.map((d, i) => (
                   <Cell key={i} fill={d.color} />
                 ))}

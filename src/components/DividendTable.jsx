@@ -1,7 +1,21 @@
+import { useState } from 'react'
 import { currencySymbol } from '../utils/currency'
 import { DividendHistoryChart } from './DividendChart'
 
+const SORT_OPTIONS = [
+  { key: null, label: 'Default' },
+  { key: 'annual_income', label: 'Annual Income' },
+  { key: 'dividend_yield', label: 'Yield' },
+  { key: 'dividend_rate', label: 'Rate/Share' },
+  { key: 'monthly_income', label: 'Monthly Income' },
+  { key: 'shares', label: 'Shares' },
+  { key: 'ticker', label: 'Ticker' },
+]
+
 export default function DividendTable({ holdings }) {
+  const [sortKey, setSortKey] = useState(null)
+  const [sortDir, setSortDir] = useState('desc')
+
   if (!holdings?.length) {
     return (
       <div className="bg-surface-2 rounded-xl border border-border p-8 text-center text-text-muted">
@@ -10,9 +24,45 @@ export default function DividendTable({ holdings }) {
     )
   }
 
+  const sorted = [...holdings].sort((a, b) => {
+    if (!sortKey) return 0
+    let av = a[sortKey]
+    let bv = b[sortKey]
+    if (typeof av === 'string') {
+      return sortDir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av)
+    }
+    return sortDir === 'asc' ? av - bv : bv - av
+  })
+
   return (
-    <div className="space-y-4">
-      {holdings.map((h) => {
+    <div className="space-y-3">
+      <div className="flex items-center gap-2">
+        <span className="text-xs text-text-muted">Sort:</span>
+        <select
+          value={sortKey || ''}
+          onChange={(e) => {
+            const key = e.target.value || null
+            setSortKey(key)
+            setSortDir(key === 'ticker' ? 'asc' : 'desc')
+          }}
+          className="bg-surface-3 border border-border rounded-lg px-2 py-1.5 text-xs text-text outline-none"
+        >
+          {SORT_OPTIONS.map((o) => (
+            <option key={o.key || 'default'} value={o.key || ''}>{o.label}</option>
+          ))}
+        </select>
+        {sortKey && (
+          <button
+            onClick={() => setSortDir(sortDir === 'asc' ? 'desc' : 'asc')}
+            className="flex items-center gap-1 text-xs text-text-muted hover:text-text"
+          >
+            {sortDir === 'asc' ? 'Low first' : 'High first'}
+            <SortArrow dir={sortDir} />
+          </button>
+        )}
+      </div>
+
+      {sorted.map((h) => {
         const sym = currencySymbol(h.currency)
         return (
           <div
@@ -64,5 +114,17 @@ export default function DividendTable({ holdings }) {
         )
       })}
     </div>
+  )
+}
+
+function SortArrow({ dir }) {
+  return (
+    <svg width="8" height="10" viewBox="0 0 8 10" fill="currentColor" className="text-accent">
+      {dir === 'asc' ? (
+        <path d="M4 1L7.5 5.5H0.5z" />
+      ) : (
+        <path d="M4 9L0.5 4.5H7.5z" />
+      )}
+    </svg>
   )
 }
