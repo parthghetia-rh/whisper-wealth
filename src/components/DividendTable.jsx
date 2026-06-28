@@ -65,7 +65,12 @@ export default function DividendTable({ holdings }) {
       {sorted.map((h) => {
         const sym = currencySymbol(h.currency)
         const baseTicker = h.ticker.split('.')[0]
-        const divHistoryUrl = `https://dividendhistory.org/payout/${encodeURIComponent(baseTicker)}/`
+        const suffix = h.ticker.includes('.') ? h.ticker.split('.').pop().toUpperCase() : ''
+        const exchangeMap = { TO: 'tsx', V: 'tsx', NE: 'tsx', CN: 'tsx', NS: 'nse', BO: 'bse', L: 'lse', AX: 'asx' }
+        const exchange = exchangeMap[suffix] || ''
+        const divHistoryUrl = exchange
+          ? `https://dividendhistory.org/payout/${exchange}/${encodeURIComponent(baseTicker)}/`
+          : `https://dividendhistory.org/payout/${encodeURIComponent(baseTicker)}/`
         return (
           <div
             key={h.ticker}
