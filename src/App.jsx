@@ -6,6 +6,7 @@ import Transactions from './pages/Transactions'
 import Dividends from './pages/Dividends'
 import Cash from './pages/Cash'
 import Watchlist from './pages/Watchlist'
+import Settings from './pages/Settings'
 import Login from './pages/Login'
 
 export default function App() {
@@ -27,6 +28,7 @@ export default function App() {
           <Route path="/dividends" element={<Dividends />} />
           <Route path="/cash" element={<Cash />} />
           <Route path="/watchlist" element={<Watchlist />} />
+          <Route path="/settings" element={<Settings />} />
         </Route>
       </Routes>
     </BrowserRouter>

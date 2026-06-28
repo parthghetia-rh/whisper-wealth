@@ -66,9 +66,25 @@ db.run(`
     currency TEXT NOT NULL DEFAULT 'USD',
     amount REAL NOT NULL,
     interest_rate REAL NOT NULL DEFAULT 0,
+    type TEXT NOT NULL DEFAULT 'cash',
+    frequency TEXT NOT NULL DEFAULT 'yearly',
     created_at TEXT DEFAULT (datetime('now'))
   )
 `)
+
+try { db.run("ALTER TABLE cash_positions ADD COLUMN type TEXT NOT NULL DEFAULT 'cash'") } catch {}
+try { db.run("ALTER TABLE cash_positions ADD COLUMN frequency TEXT NOT NULL DEFAULT 'yearly'") } catch {}
+
+db.run(`
+  CREATE TABLE IF NOT EXISTS settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+  )
+`)
+
+try { db.run("ALTER TABLE dividends ADD COLUMN drip_processed INTEGER DEFAULT 0") } catch {}
+
+try { db.run("ALTER TABLE transactions ADD COLUMN source TEXT DEFAULT 'manual'") } catch {}
 
 db.run(`
   CREATE TABLE IF NOT EXISTS watchlist (

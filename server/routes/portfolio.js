@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { stmtAll, stmtGet } from '../db.js'
 import { addSSEClient, triggerPoll, triggerQuickRefresh, getRates } from '../services/poller.js'
+import { getSettingBool } from './settings.js'
 
 const router = Router()
 
@@ -109,7 +110,17 @@ router.get('/summary', (req, res) => {
 
   const cashRows = stmtAll('SELECT * FROM cash_positions')
   for (const c of cashRows) {
-    const annual_interest = c.amount * (c.interest_rate / 100)
+    const type = c.type || 'cash'
+    let annual_income
+    if (type === 'income') {
+      const freq = c.frequency || 'yearly'
+      annual_income = freq === 'weekly' ? c.amount * 52 : freq === 'monthly' ? c.amount * 12 : c.amount
+    } else {
+      const compound = getSettingBool('cash_interest_compound')
+      annual_income = compound
+        ? c.amount * Math.pow(1 + c.interest_rate / 100 / 12, 12) - c.amount
+        : c.amount * (c.interest_rate / 100)
+    }
     const currency = c.currency
     if (!byCurrency[currency]) {
       byCurrency[currency] = {
@@ -119,9 +130,11 @@ router.get('/summary', (req, res) => {
         positions: 0,
       }
     }
-    byCurrency[currency].total_value += c.amount
-    byCurrency[currency].total_cost += c.amount
-    byCurrency[currency].annual_dividends += annual_interest
+    if (type === 'cash') {
+      byCurrency[currency].total_value += c.amount
+      byCurrency[currency].total_cost += c.amount
+    }
+    byCurrency[currency].annual_dividends += annual_income
   }
 
   const currencies = Object.entries(byCurrency).map(([currency, data]) => {

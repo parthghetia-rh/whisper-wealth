@@ -36,23 +36,27 @@ Most portfolio trackers require you to hand your financial data to a third party
 
 ## Features
 
-- **Transaction Management** — Add, edit, delete, and CSV/TSV import buy/sell transactions for any ticker
+- **Transaction Management** — Add, edit, delete buy/sell transactions for any ticker
+- **Universal File Import** — CSV, TSV, and PDF import with column mapping. Works with Wealthsimple, Questrade, Scotiabank, or any broker
+- **PDF Email Import** — Print broker confirmation emails to PDF, drop them in, transactions are extracted automatically
+- **Exchange-Aware Import** — Default exchange selector (TSX, NEO, NSE, etc.) auto-appends ticker suffixes on import
 - **Live Market Data** — Real-time stock prices from Yahoo Finance, configurable refresh (30s to 5min)
-- **Watchlist** — Track any ticker with independent refresh controls and sortable columns
+- **Watchlist** — Track any ticker with 3M/6M/1Y performance, sortable columns, and click-to-expand historical charts
+- **Historical Charts** — Interactive area charts with 1M/3M/6M/1Y range toggles per ticker
 - **Dividend Tracking** — Projected weekly/monthly/yearly dividend income from actual payment history
-- **Sitting Cash** — Track idle cash with configurable interest rates and projected interest income
-- **Multi-Currency Support** — Handles USD, CAD, INR, EUR, GBP and more with live forex conversion
+- **DRIP (Dividend Reinvestment)** — Auto-reinvest dividends with fractional/whole share toggle
+- **Cash & Income** — Track sitting cash with interest (simple or compound) and recurring income (cashback, rent, paybacks)
+- **Multi-Currency Support** — USD, CAD, INR, EUR, GBP and more with live forex conversion
 - **Currency Converter** — Toggle display currency to see your entire portfolio converted at live rates
-- **Portfolio Allocation** — Pie chart and percentage breakdown of your holdings
+- **Portfolio Allocation** — Pie chart and percentage breakdown with hide/show values toggle
 - **Dividend Comparison Charts** — Visual comparison of dividend yields and payment trends
-- **Universal CSV Import** — Column mapper works with Wealthsimple, Questrade, or any broker export
-- **Exchange-Aware Import** — Automatically appends .TO, .NE, .NS suffixes based on the exchange column
+- **Settings** — DRIP, fractional shares, compound interest toggles
 - **6 Built-in Themes** — Midnight, Carbon, Ocean, Emerald, Sunset, Rose
-- **Privacy Toggle** — Hide/show values in the allocation view
-- **Draggable Sidebar** — Reorder navigation tabs to your preference
-- **Mobile Responsive** — Collapsible sidebar, scrollable tables, stacking layouts
-- **Token Auth** — Auto-generated bearer token, login page, timing-safe comparison
-- **Fully Local** — SQLite database stored on disk, server bound to localhost only
+- **Collapsible Sidebar** — Minimize to icons on desktop, draggable tab reordering
+- **Mobile App Experience** — Bottom tab navigation, card views, PWA installable on phone home screen
+- **Token Auth** — Auto-generated bearer token, login page, timing-safe comparison, rate limiting
+- **Security Hardened** — Helmet headers, input validation, atomic DB writes, non-root Docker, SSE limits
+- **Fully Local** — SQLite database, localhost-only binding, zero telemetry
 
 ## Tech Stack
 
@@ -255,23 +259,28 @@ whisperwealth/
 │   ├── auth.js             # Token-based authentication
 │   ├── db.js               # SQLite setup and helpers
 │   ├── routes/
-│   │   ├── transactions.js # Buy/sell CRUD + CSV import
+│   │   ├── transactions.js # Buy/sell CRUD + CSV/PDF import
 │   │   ├── portfolio.js    # Holdings, summary, SSE, rates
 │   │   ├── dividends.js    # Dividend income calculations
-│   │   ├── cash.js         # Sitting cash positions
-│   │   └── watchlist.js    # Watchlist CRUD + quotes
+│   │   ├── cash.js         # Cash positions + recurring income
+│   │   ├── watchlist.js    # Watchlist CRUD + charts + quotes
+│   │   └── settings.js     # App settings (DRIP, compound, etc.)
 │   └── services/
 │       ├── stockService.js # Yahoo Finance API wrapper
-│       ├── poller.js       # Price/dividend/rate refresh
-│       └── csvParser.js    # CSV import parser
+│       ├── poller.js       # Price/dividend/rate refresh + DRIP
+│       ├── csvParser.js    # CSV/TSV import with column mapping
+│       └── pdfParser.js    # PDF text extraction + transaction parsing
 ├── src/                    # React frontend
-│   ├── pages/              # Dashboard, Transactions, Dividends, Cash, Watchlist
-│   ├── components/         # Shared UI components
+│   ├── pages/              # Dashboard, Transactions, Dividends, Cash, Watchlist, Settings, Login
+│   ├── components/         # Shared UI (StockCard, TickerChart, CSVImport, etc.)
 │   ├── hooks/              # useApi, useSSE
 │   └── utils/              # Currency helpers, theme definitions
-├── samples/                # Sample CSV files for import testing
+├── samples/                # Sample CSV/TSV files for import testing
+├── public/                 # Favicon, PWA manifest
+├── .github/workflows/      # Docker build CI pipeline
 ├── Dockerfile
-├── docker-compose.yml
+├── docker-compose.yml      # Production (pulls from GHCR)
+├── docker-compose.dev.yml  # Development (builds from source)
 └── package.json
 ```
 

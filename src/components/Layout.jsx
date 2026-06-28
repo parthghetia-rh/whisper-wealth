@@ -172,6 +172,25 @@ export default function Layout({ onLogout }) {
           })}
         </div>
 
+        <div className="px-2 pb-1">
+          <NavLink
+            to="/settings"
+            className={({ isActive }) =>
+              `flex items-center rounded-lg text-sm transition-colors ${
+                collapsed ? 'justify-center p-2.5' : 'gap-2.5 px-3 py-2'
+              } ${
+                isActive
+                  ? 'bg-accent/15 text-accent-hover font-medium'
+                  : 'text-text-muted hover:text-text hover:bg-surface-3'
+              }`
+            }
+            title={collapsed ? 'Settings' : undefined}
+          >
+            <SettingsIcon />
+            {!collapsed && 'Settings'}
+          </NavLink>
+        </div>
+
         {!collapsed && (
           <div className="px-2 pb-2">
             <button
@@ -340,14 +359,23 @@ export default function Layout({ onLogout }) {
                 </button>
               ))}
             </div>
-            {onLogout && (
-              <button
-                onClick={onLogout}
-                className="text-xs text-text-muted hover:text-red transition-colors"
+            <div className="flex gap-3">
+              <NavLink
+                to="/settings"
+                onClick={() => setSettingsOpen(false)}
+                className="text-xs text-accent hover:text-accent-hover transition-colors"
               >
-                Log out
-              </button>
-            )}
+                Settings
+              </NavLink>
+              {onLogout && (
+                <button
+                  onClick={onLogout}
+                  className="text-xs text-text-muted hover:text-red transition-colors"
+                >
+                  Log out
+                </button>
+              )}
+            </div>
           </div>
         )}
 
@@ -430,6 +458,15 @@ function WatchlistIcon() {
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
       <circle cx="8" cy="8" r="6" />
       <path d="M8 4.5v4l2.5 1.5" />
+    </svg>
+  )
+}
+
+function SettingsIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="8" cy="8" r="2" />
+      <path d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2M3.3 3.3l1.4 1.4M11.3 11.3l1.4 1.4M3.3 12.7l1.4-1.4M11.3 4.7l1.4-1.4" />
     </svg>
   )
 }

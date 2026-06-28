@@ -1,5 +1,6 @@
 import { Router } from 'express'
 import { stmtAll, stmtGet } from '../db.js'
+import { getSettingBool } from './settings.js'
 
 const router = Router()
 
@@ -85,12 +86,22 @@ router.get('/income', (req, res) => {
 
   const cashRows = stmtAll('SELECT * FROM cash_positions')
   for (const c of cashRows) {
-    const annual_interest = c.amount * (c.interest_rate / 100)
-    if (annual_interest <= 0) continue
+    const type = c.type || 'cash'
+    let annual_income
+    if (type === 'income') {
+      const freq = c.frequency || 'yearly'
+      annual_income = freq === 'weekly' ? c.amount * 52 : freq === 'monthly' ? c.amount * 12 : c.amount
+    } else {
+      const compound = getSettingBool('cash_interest_compound')
+      annual_income = compound
+        ? c.amount * Math.pow(1 + c.interest_rate / 100 / 12, 12) - c.amount
+        : c.amount * (c.interest_rate / 100)
+    }
+    if (annual_income <= 0) continue
     if (!byCurrency[c.currency]) {
       byCurrency[c.currency] = { holdings: [], total_annual: 0 }
     }
-    byCurrency[c.currency].total_annual += annual_interest
+    byCurrency[c.currency].total_annual += annual_income
   }
 
   const currencies = Object.entries(byCurrency).map(([currency, data]) => ({
