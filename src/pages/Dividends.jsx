@@ -73,7 +73,17 @@ export default function Dividends() {
               <h3 className="text-sm font-medium text-text-muted mb-3">
                 Comparison
               </h3>
-              <DividendComparisonChart holdings={allHoldings} />
+              <DividendComparisonChart
+                holdings={allHoldings}
+                onTickerClick={(ticker) => {
+                  const el = document.getElementById(`dividend-${ticker}`)
+                  if (el) {
+                    el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                    el.classList.add('ring-2', 'ring-accent')
+                    setTimeout(() => el.classList.remove('ring-2', 'ring-accent'), 2000)
+                  }
+                }}
+              />
             </div>
           )}
 

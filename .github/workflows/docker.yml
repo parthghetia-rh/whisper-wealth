@@ -1,6 +1,8 @@
 name: Build & Push Docker Image
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
     inputs:
       tag:
@@ -36,7 +38,7 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            type=raw,value=${{ github.event.inputs.tag }}
+            type=raw,value=${{ github.event.inputs.tag || 'latest' }}
             type=sha,prefix=
 
       - name: Build and push

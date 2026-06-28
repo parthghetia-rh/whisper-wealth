@@ -64,14 +64,26 @@ export default function DividendTable({ holdings }) {
 
       {sorted.map((h) => {
         const sym = currencySymbol(h.currency)
+        const yahooUrl = `https://finance.yahoo.com/quote/${encodeURIComponent(h.ticker)}/dividends/`
         return (
           <div
             key={h.ticker}
-            className="bg-surface-2 rounded-xl border border-border overflow-hidden"
+            id={`dividend-${h.ticker}`}
+            className="bg-surface-2 rounded-xl border border-border overflow-hidden scroll-mt-4"
           >
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-4 gap-3">
               <div>
-                <span className="font-medium">{h.ticker}</span>
+                <a
+                  href={yahooUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-medium hover:text-accent transition-colors inline-flex items-center gap-1"
+                >
+                  {h.ticker}
+                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-text-muted">
+                    <path d="M7.5 5.5v2.5h-5.5v-5.5h2.5M6 1.5h2.5v2.5M4 6l4.5-4.5" />
+                  </svg>
+                </a>
                 <span className="text-text-muted text-sm ml-2">{h.name}</span>
               </div>
               <div className="grid grid-cols-3 sm:flex gap-4 sm:gap-6 text-sm">

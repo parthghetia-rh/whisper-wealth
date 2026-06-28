@@ -9,8 +9,16 @@ const COLORS = [
   '#06b6d4', '#ec4899', '#14b8a6', '#f97316', '#a855f7',
 ]
 
-export function DividendComparisonChart({ holdings }) {
+export function DividendComparisonChart({ holdings, onTickerClick }) {
   const navigate = useNavigate()
+
+  const handleClick = (ticker) => {
+    if (onTickerClick) {
+      onTickerClick(ticker)
+    } else {
+      navigate(`/watchlist?ticker=${ticker}`)
+    }
+  }
 
   if (!holdings?.length) return null
 
@@ -42,7 +50,7 @@ export function DividendComparisonChart({ holdings }) {
                 <div
                   key={d.ticker}
                   className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"
-                  onClick={() => navigate(`/watchlist?ticker=${d.ticker}`)}
+                  onClick={() => handleClick(d.ticker)}
                 >
                   <span className="text-xs font-medium w-16 shrink-0">
                     {d.ticker}
@@ -99,7 +107,7 @@ export function DividendComparisonChart({ holdings }) {
                 radius={[0, 4, 4, 0]}
                 barSize={20}
                 className="cursor-pointer"
-                onClick={(entry) => navigate(`/watchlist?ticker=${entry.ticker}`)}
+                onClick={(entry) => handleClick(entry.ticker)}
               >
                 {data.map((d, i) => (
                   <Cell key={i} fill={d.color} />
