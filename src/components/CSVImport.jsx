@@ -17,6 +17,7 @@ export default function CSVImport({ onImported }) {
   const [mapping, setMapping] = useState({})
   const [preview, setPreview] = useState(null)
   const [pdfRawText, setPdfRawText] = useState(null)
+  const [pdfExchange, setPdfExchange] = useState('TSX')
   const [result, setResult] = useState(null)
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -33,6 +34,7 @@ export default function CSVImport({ onImported }) {
     setMapping({})
     setPreview(null)
     setPdfRawText(null)
+    setPdfExchange('TSX')
     setResult(null)
     setError(null)
     setMode('transactions')
@@ -63,7 +65,7 @@ export default function CSVImport({ onImported }) {
           reader.readAsDataURL(file)
         })
 
-        const data = await postApi('/api/transactions/import/parse-pdf', { pdf: base64 })
+        const data = await postApi('/api/transactions/import/parse-pdf', { pdf: base64, exchange: pdfExchange })
         if (!data) {
           setError('No response from server. Check your auth token.')
           setStep('upload')
@@ -226,6 +228,36 @@ export default function CSVImport({ onImported }) {
       )}
 
       {step === 'upload' && !loading && (
+        <>
+        <div className="flex flex-col sm:flex-row gap-3">
+          <div className="sm:w-56">
+            <label className="block text-xs text-text-muted mb-1">
+              Default exchange (for PDF imports)
+            </label>
+            <select
+              value={pdfExchange}
+              onChange={(e) => setPdfExchange(e.target.value)}
+              className="w-full bg-surface-3 border border-border rounded-lg px-3 py-2 text-sm text-text outline-none focus:border-accent"
+            >
+              <option value="">None (US stocks)</option>
+              <option value="TSX">TSX (.TO) — Toronto</option>
+              <option value="NEO">NEO (.NE) — NEO Exchange</option>
+              <option value="TSXV">TSXV (.V) — TSX Venture</option>
+              <option value="CNSX">CSE (.CN) — Canadian Securities</option>
+              <option value="NSE">NSE (.NS) — India</option>
+              <option value="BSE">BSE (.BO) — Bombay</option>
+              <option value="LSE">LSE (.L) — London</option>
+              <option value="ASX">ASX (.AX) — Australia</option>
+            </select>
+          </div>
+          <div className="flex-1 flex items-end">
+            <p className="text-[11px] text-text-muted leading-relaxed">
+              Tickers without a suffix (e.g. ENB, BANK) will get the exchange suffix added automatically.
+              Tickers that already have a suffix (e.g. AAPL.TO) are left as-is.
+              For CSV/TSV files, use the Exchange column mapping instead.
+            </p>
+          </div>
+        </div>
         <div
           onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
           onDragLeave={() => setDragOver(false)}
@@ -249,6 +281,7 @@ export default function CSVImport({ onImported }) {
             CSV/TSV: broker exports with column mapping. PDF: printed broker confirmation emails.
           </p>
         </div>
+        </>
       )}
 
       {step === 'map' && (

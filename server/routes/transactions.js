@@ -110,8 +110,13 @@ router.delete('/:id', (req, res) => {
   res.json({ success: true })
 })
 
+const PDF_EXCHANGE_SUFFIX = {
+  TSX: '.TO', NEO: '.NE', TSXV: '.V', CNSX: '.CN',
+  NSE: '.NS', BSE: '.BO', LSE: '.L', ASX: '.AX',
+}
+
 router.post('/import/parse-pdf', async (req, res) => {
-  const { pdf } = req.body
+  const { pdf, exchange } = req.body
   if (!pdf || typeof pdf !== 'string') {
     return res.status(400).json({ error: 'PDF data is required (base64)' })
   }
@@ -121,6 +126,16 @@ router.post('/import/parse-pdf', async (req, res) => {
     if (result.error) {
       return res.status(400).json({ error: result.error })
     }
+
+    if (exchange && PDF_EXCHANGE_SUFFIX[exchange]) {
+      const suffix = PDF_EXCHANGE_SUFFIX[exchange]
+      for (const t of result.transactions) {
+        if (!t.ticker.includes('.')) {
+          t.ticker = t.ticker + suffix
+        }
+      }
+    }
+
     res.json(result)
   } catch (err) {
     console.error('PDF parse failed:', err.message)
