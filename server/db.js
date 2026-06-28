@@ -87,6 +87,30 @@ try { db.run("ALTER TABLE dividends ADD COLUMN drip_processed INTEGER DEFAULT 0"
 try { db.run("ALTER TABLE transactions ADD COLUMN source TEXT DEFAULT 'manual'") } catch {}
 
 db.run(`
+  CREATE TABLE IF NOT EXISTS portfolio_snapshots (
+    date TEXT PRIMARY KEY,
+    total_value REAL,
+    total_cost REAL,
+    total_gain REAL,
+    annual_dividends REAL,
+    positions INTEGER,
+    updated_at TEXT DEFAULT (datetime('now'))
+  )
+`)
+
+db.run(`
+  CREATE TABLE IF NOT EXISTS milestones (
+    id TEXT PRIMARY KEY,
+    category TEXT NOT NULL,
+    title TEXT NOT NULL,
+    description TEXT,
+    icon TEXT,
+    achieved_at TEXT DEFAULT (datetime('now')),
+    value REAL
+  )
+`)
+
+db.run(`
   CREATE TABLE IF NOT EXISTS watchlist (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     ticker TEXT NOT NULL UNIQUE,

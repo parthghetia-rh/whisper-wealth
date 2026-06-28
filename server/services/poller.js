@@ -1,5 +1,6 @@
 import db, { stmtAll, stmtRun, stmtRunBatch, stmtGet, save } from '../db.js'
 import { getQuotes, getDividendHistory, getExchangeRates } from './stockService.js'
+import { checkMilestones } from './milestones.js'
 
 const POLL_INTERVAL = 5 * 60 * 1000
 const MAX_SSE_CLIENTS = 20
@@ -86,9 +87,89 @@ async function poll() {
     latestRates = await getExchangeRates(allCurrencies)
   }
 
+  takeSnapshot()
+
   if (quotes.length) {
     broadcast({ type: 'quotes', data: quotes, rates: latestRates })
   }
+}
+
+function takeSnapshot() {
+  const today = new Date().toISOString().split('T')[0]
+
+  const txns = stmtAll('SELECT ticker, type, shares, price_per_share FROM transactions')
+  const holdingsMap = {}
+  for (const t of txns) {
+    if (!holdingsMap[t.ticker]) holdingsMap[t.ticker] = { shares: 0, cost: 0 }
+    if (t.type === 'buy') {
+      holdingsMap[t.ticker].cost += t.shares * t.price_per_share
+      holdingsMap[t.ticker].shares += t.shares
+    } else {
+      const avg = holdingsMap[t.ticker].shares > 0 ? holdingsMap[t.ticker].cost / holdingsMap[t.ticker].shares : 0
+      holdingsMap[t.ticker].shares -= t.shares
+      holdingsMap[t.ticker].cost = holdingsMap[t.ticker].shares * avg
+    }
+  }
+
+  let totalValue = 0
+  let totalCost = 0
+  let positions = 0
+  for (const [ticker, h] of Object.entries(holdingsMap)) {
+    if (h.shares <= 0) continue
+    const quote = stmtGet('SELECT price FROM quotes WHERE ticker = ?', [ticker])
+    totalValue += h.shares * (quote?.price || (h.shares > 0 ? h.cost / h.shares : 0))
+    totalCost += h.cost
+    positions++
+  }
+
+  const cashRows = stmtAll('SELECT * FROM cash_positions')
+  for (const c of cashRows) {
+    if ((c.type || 'cash') === 'cash') {
+      totalValue += c.amount
+      totalCost += c.amount
+    }
+  }
+
+  let annualDividends = 0
+  const oneYearAgo = new Date()
+  oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1)
+  const cutoff = oneYearAgo.toISOString().split('T')[0]
+  for (const [ticker, h] of Object.entries(holdingsMap)) {
+    if (h.shares <= 0) continue
+    const divs = stmtAll('SELECT amount FROM dividends WHERE ticker = ? AND ex_date >= ?', [ticker, cutoff])
+    annualDividends += h.shares * divs.reduce((s, d) => s + d.amount, 0)
+  }
+  for (const c of cashRows) {
+    if ((c.type || 'cash') === 'income') {
+      const freq = c.frequency || 'yearly'
+      annualDividends += freq === 'weekly' ? c.amount * 52 : freq === 'monthly' ? c.amount * 12 : c.amount
+    } else if ((c.type || 'cash') === 'cash') {
+      annualDividends += c.amount * ((c.interest_rate || 0) / 100)
+    }
+  }
+
+  const snapshot = {
+    total_value: Math.round(totalValue * 100) / 100,
+    total_cost: Math.round(totalCost * 100) / 100,
+    total_gain: Math.round((totalValue - totalCost) * 100) / 100,
+    annual_dividends: Math.round(annualDividends * 100) / 100,
+    positions,
+  }
+
+  const existing = stmtGet('SELECT 1 FROM portfolio_snapshots WHERE date = ?', [today])
+  if (!existing) {
+    stmtRun(
+      "INSERT INTO portfolio_snapshots (date, total_value, total_cost, total_gain, annual_dividends, positions) VALUES (?, ?, ?, ?, ?, ?)",
+      [today, snapshot.total_value, snapshot.total_cost, snapshot.total_gain, snapshot.annual_dividends, snapshot.positions]
+    )
+  } else {
+    stmtRun(
+      "UPDATE portfolio_snapshots SET total_value = ?, total_cost = ?, total_gain = ?, annual_dividends = ?, positions = ?, updated_at = datetime('now') WHERE date = ?",
+      [snapshot.total_value, snapshot.total_cost, snapshot.total_gain, snapshot.annual_dividends, snapshot.positions, today]
+    )
+  }
+
+  checkMilestones(snapshot)
 }
 
 export function getRates() {

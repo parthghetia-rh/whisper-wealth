@@ -7,6 +7,7 @@ import Dividends from './pages/Dividends'
 import Cash from './pages/Cash'
 import Watchlist from './pages/Watchlist'
 import Settings from './pages/Settings'
+import Milestones from './pages/Milestones'
 import Login from './pages/Login'
 
 export default function App() {
@@ -29,6 +30,7 @@ export default function App() {
           <Route path="/cash" element={<Cash />} />
           <Route path="/watchlist" element={<Watchlist />} />
           <Route path="/settings" element={<Settings />} />
+          <Route path="/milestones" element={<Milestones />} />
         </Route>
       </Routes>
     </BrowserRouter>

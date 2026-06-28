@@ -28,9 +28,12 @@ Most portfolio trackers require you to hand your financial data to a third party
 
 - **Zero data collection** — No telemetry, analytics, or cookies. Ever.
 - **One-command deploy** — `docker compose up -d` and you're running.
-- **Broker agnostic** — Import from any broker via CSV/TSV with a universal column mapper.
-- **Multi-currency native** — Track CAD, USD, INR, EUR, GBP holdings side by side with live forex conversion.
+- **Live market dashboard** — Real-time prices with configurable refresh (10s to 5min), pre-market and after-hours data, SSE push updates.
+- **True income projections** — Dividends from actual payment history + cash interest (simple/compound) + recurring income, all converted to your display currency.
+- **Broker agnostic** — Import from any broker via CSV/TSV column mapper or printed email PDFs with auto-extraction.
+- **Multi-currency native** — Track CAD, USD, INR, EUR, GBP holdings side by side with live forex conversion. Add forex pairs (CADUSD=X) to your watchlist.
 - **Tailscale ready** — Access securely from any device on your private network.
+- **Mobile-first** — PWA installable on your phone with bottom tab navigation and card-based views.
 
 ---
 
