@@ -37,6 +37,11 @@ export default function Watchlist() {
   const [sortDir, setSortDir] = useState('desc')
   const [searchParams, setSearchParams] = useSearchParams()
   const [expandedTicker, setExpandedTicker] = useState(() => searchParams.get('ticker') || null)
+  const [customOrder, setCustomOrder] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('watchlist-order')) || null } catch { return null }
+  })
+  const [dragIdx, setDragIdx] = useState(null)
+  const [overIdx, setOverIdx] = useState(null)
   const [interval, setIntervalMs] = useState(() => {
     const saved = localStorage.getItem(STORAGE_KEY)
     return saved ? Number(saved) : 30_000
@@ -89,6 +94,14 @@ export default function Watchlist() {
 
   const handleDelete = async (id) => {
     await deleteApi(`/api/watchlist/${id}`)
+    if (customOrder) {
+      const item = items.find((i) => i.id === id)
+      if (item) {
+        const updated = customOrder.filter((t) => t !== item.ticker)
+        setCustomOrder(updated)
+        localStorage.setItem('watchlist-order', JSON.stringify(updated))
+      }
+    }
     refetch()
   }
 
@@ -101,25 +114,68 @@ export default function Watchlist() {
     }
   }
 
+  const handleDragStart = (e, idx) => {
+    setDragIdx(idx)
+    e.dataTransfer.effectAllowed = 'move'
+  }
+  const handleDragOver = (e, idx) => {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    setOverIdx(idx)
+  }
+  const handleDrop = (e, idx) => {
+    e.preventDefault()
+    if (dragIdx === null || dragIdx === idx) return
+    const list = [...orderedItems]
+    const [moved] = list.splice(dragIdx, 1)
+    list.splice(idx, 0, moved)
+    const order = list.map((i) => i.ticker)
+    setCustomOrder(order)
+    localStorage.setItem('watchlist-order', JSON.stringify(order))
+    setSortKey(null)
+    setDragIdx(null)
+    setOverIdx(null)
+  }
+  const handleDragEnd = () => { setDragIdx(null); setOverIdx(null) }
+
+  const resetOrder = () => {
+    setCustomOrder(null)
+    localStorage.removeItem('watchlist-order')
+    setSortKey(null)
+  }
+
   const items = data?.items || []
 
-  const sortedItems = [...items].sort((a, b) => {
-    if (!sortKey) return 0
-    const col = WL_COLUMNS.find((c) => c.key === sortKey)
-    if (!col) return 0
-    let av, bv
-    if (['3m', '6m', '1y'].includes(sortKey)) {
-      av = col.getP(a.periodChanges) ?? -Infinity
-      bv = col.getP(b.periodChanges) ?? -Infinity
-    } else {
-      av = col.get(a.quote)
-      bv = col.get(b.quote)
+  const orderedItems = (() => {
+    if (sortKey) {
+      return [...items].sort((a, b) => {
+        const col = WL_COLUMNS.find((c) => c.key === sortKey)
+        if (!col) return 0
+        let av, bv
+        if (['3m', '6m', '1y'].includes(sortKey)) {
+          av = col.getP(a.periodChanges) ?? -Infinity
+          bv = col.getP(b.periodChanges) ?? -Infinity
+        } else {
+          av = col.get(a.quote)
+          bv = col.get(b.quote)
+        }
+        if (typeof av === 'string') {
+          return sortDir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av)
+        }
+        return sortDir === 'asc' ? av - bv : bv - av
+      })
     }
-    if (typeof av === 'string') {
-      return sortDir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av)
+    if (customOrder) {
+      const byTicker = {}
+      items.forEach((i) => { byTicker[i.ticker] = i })
+      const ordered = customOrder.map((t) => byTicker[t]).filter(Boolean)
+      const remaining = items.filter((i) => !customOrder.includes(i.ticker))
+      return [...ordered, ...remaining]
     }
-    return sortDir === 'asc' ? av - bv : bv - av
-  })
+    return items
+  })()
+
+  const sortedItems = orderedItems
 
   return (
     <div className="space-y-6 max-w-6xl">
@@ -166,6 +222,14 @@ export default function Watchlist() {
               {lastRefresh.toLocaleTimeString()}
             </span>
           )}
+          {customOrder && (
+            <button
+              onClick={resetOrder}
+              className="text-[10px] text-text-muted hover:text-accent transition-colors"
+            >
+              Reset order
+            </button>
+          )}
         </div>
       </div>
 
@@ -211,7 +275,7 @@ export default function Watchlist() {
                 }}
                 className="bg-surface-3 border border-border rounded-lg px-2 py-1.5 text-xs text-text outline-none"
               >
-                <option value="">Default</option>
+                <option value="">{customOrder ? 'Custom order' : 'Default'}</option>
                 <option value="change_percent">Day Change</option>
                 <option value="3m">3M Change</option>
                 <option value="6m">6M Change</option>
@@ -280,7 +344,7 @@ export default function Watchlist() {
                 </tr>
               </thead>
               <tbody>
-                {sortedItems.map((item) => {
+                {sortedItems.map((item, idx) => {
                   const q = item.quote
                   const pc = item.periodChanges
                   const isExpanded = expandedTicker === item.ticker
@@ -307,13 +371,25 @@ export default function Watchlist() {
                     <>
                       <tr
                         key={item.id}
+                        draggable
+                        onDragStart={(e) => handleDragStart(e, idx)}
+                        onDragOver={(e) => handleDragOver(e, idx)}
+                        onDrop={(e) => handleDrop(e, idx)}
+                        onDragEnd={handleDragEnd}
                         onClick={() => setExpandedTicker(isExpanded ? null : item.ticker)}
                         className={`border-b border-border/30 cursor-pointer transition-colors ${
                           isExpanded ? 'bg-surface-3/40' : 'hover:bg-surface-3/40'
+                        } ${dragIdx === idx ? 'opacity-40' : ''} ${
+                          overIdx === idx && dragIdx !== idx ? 'border-t-2 border-accent' : ''
                         }`}
                       >
-                        <td className="p-3 pl-4">
-                          <div className="flex items-center gap-2.5">
+                        <td className="p-3 pl-2">
+                          <div className="flex items-center gap-2">
+                            <svg width="8" height="12" viewBox="0 0 8 12" fill="currentColor" className="shrink-0 cursor-grab text-text-muted" style={{ opacity: 0.3 }}>
+                              <circle cx="2" cy="2" r="1" /><circle cx="6" cy="2" r="1" />
+                              <circle cx="2" cy="6" r="1" /><circle cx="6" cy="6" r="1" />
+                              <circle cx="2" cy="10" r="1" /><circle cx="6" cy="10" r="1" />
+                            </svg>
                             <div className={`w-1.5 h-6 rounded-full ${up ? 'bg-green' : 'bg-red'}`} />
                             <div>
                               <div className="font-medium">{q.ticker}</div>

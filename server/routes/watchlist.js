@@ -3,12 +3,16 @@ import { stmtAll, stmtGet, stmtRun } from '../db.js'
 import { getQuotes, getPeriodChanges, getChartData } from '../services/stockService.js'
 
 const router = Router()
-const TICKER_RE = /^[A-Z0-9.\-]{1,20}$/
+const TICKER_RE = /^[A-Z0-9.\-=]{1,20}$/
 const MAX_WATCHLIST = 200
+
+const delay = (ms) => new Promise((r) => setTimeout(r, ms))
 
 let cachedQuotes = {}
 let cachedPeriodChanges = {}
 let lastFetch = 0
+let lastPeriodFetch = 0
+const PERIOD_CACHE_MS = 30 * 60 * 1000
 
 async function fetchWatchlistQuotes() {
   const rows = stmtAll('SELECT ticker FROM watchlist')
@@ -23,12 +27,17 @@ async function fetchWatchlistQuotes() {
   cachedQuotes = map
   lastFetch = Date.now()
 
-  for (const ticker of tickers) {
-    try {
-      cachedPeriodChanges[ticker] = await getPeriodChanges(ticker)
-    } catch {
-      cachedPeriodChanges[ticker] = {}
+  const needPeriodRefresh = Date.now() - lastPeriodFetch > PERIOD_CACHE_MS
+  if (needPeriodRefresh) {
+    for (let i = 0; i < tickers.length; i++) {
+      if (i > 0 && i % 3 === 0) await delay(2000)
+      try {
+        cachedPeriodChanges[tickers[i]] = await getPeriodChanges(tickers[i])
+      } catch {
+        cachedPeriodChanges[tickers[i]] = {}
+      }
     }
+    lastPeriodFetch = Date.now()
   }
 
   return map

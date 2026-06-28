@@ -63,7 +63,9 @@ async function poll() {
     )
   }
 
-  for (const ticker of tickers) {
+  for (let i = 0; i < tickers.length; i++) {
+    if (i > 0 && i % 3 === 0) await new Promise((r) => setTimeout(r, 2000))
+    const ticker = tickers[i]
     const divs = await getDividendHistory(ticker)
     for (const d of divs) {
       try {

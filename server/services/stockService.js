@@ -4,11 +4,15 @@ const yahooFinance = new YahooFinance({
   suppressNotices: ['yahooSurvey', 'ripHistorical'],
 })
 
+const delay = (ms) => new Promise((r) => setTimeout(r, ms))
+
 export async function getQuotes(tickers) {
   if (!tickers.length) return []
 
   const results = []
-  for (const ticker of tickers) {
+  for (let i = 0; i < tickers.length; i++) {
+    if (i > 0 && i % 5 === 0) await delay(1000)
+    const ticker = tickers[i]
     try {
       const quote = await yahooFinance.quote(ticker)
       results.push({
@@ -41,29 +45,36 @@ export async function getQuotes(tickers) {
 
 export async function getPeriodChanges(ticker) {
   const now = new Date()
-  const changes = {}
+  const oneYearAgo = new Date(now)
+  oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1)
 
-  for (const [label, months] of [['3m', 3], ['6m', 6], ['1y', 12]]) {
-    try {
-      const start = new Date(now)
-      start.setMonth(start.getMonth() - months)
-      const result = await yahooFinance.chart(ticker, {
-        period1: start.toISOString().split('T')[0],
-        period2: now.toISOString().split('T')[0],
-        interval: '1d',
-      })
-      const quotes = result.quotes || []
-      if (quotes.length >= 2) {
-        const first = quotes[0].close
-        const last = quotes[quotes.length - 1].close
-        changes[label] = first > 0 ? Math.round(((last - first) / first) * 10000) / 100 : 0
+  try {
+    const result = await yahooFinance.chart(ticker, {
+      period1: oneYearAgo.toISOString().split('T')[0],
+      period2: now.toISOString().split('T')[0],
+      interval: '1d',
+    })
+    const quotes = (result.quotes || []).filter((q) => q.close > 0)
+    if (quotes.length < 2) return {}
+
+    const last = quotes[quotes.length - 1].close
+    const changes = {}
+
+    for (const [label, months] of [['3m', 3], ['6m', 6], ['1y', 12]]) {
+      const cutoff = new Date(now)
+      cutoff.setMonth(cutoff.getMonth() - months)
+      const ref = quotes.find((q) => q.date >= cutoff)
+      if (ref && ref.close > 0) {
+        changes[label] = Math.round(((last - ref.close) / ref.close) * 10000) / 100
+      } else {
+        changes[label] = null
       }
-    } catch {
-      changes[label] = null
     }
-  }
 
-  return changes
+    return changes
+  } catch {
+    return {}
+  }
 }
 
 export async function getChartData(ticker, range) {
