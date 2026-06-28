@@ -68,6 +68,41 @@ export default function Expenses() {
     } catch (err) { setError(err.message) }
   }
 
+  const [sortKey, setSortKey] = useState(null)
+  const [sortDir, setSortDir] = useState('desc')
+
+  const handleSort = (key) => {
+    if (sortKey === key) {
+      setSortDir(sortDir === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortKey(key)
+      setSortDir(key === 'label' || key === 'category' ? 'asc' : 'desc')
+    }
+  }
+
+  const annualizeAmount = (e) => {
+    if (e.frequency === 'weekly') return e.amount * 52
+    if (e.frequency === 'biweekly') return e.amount * 26
+    if (e.frequency === 'monthly') return e.amount * 12
+    return e.amount
+  }
+
+  const sortedExpenses = [...(expenses || [])].sort((a, b) => {
+    if (!sortKey) return 0
+    let av, bv
+    if (sortKey === 'monthly') {
+      av = annualizeAmount(a) / 12
+      bv = annualizeAmount(b) / 12
+    } else {
+      av = a[sortKey]
+      bv = b[sortKey]
+    }
+    if (typeof av === 'string') {
+      return sortDir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av)
+    }
+    return sortDir === 'asc' ? av - bv : bv - av
+  })
+
   const currencies = summary?.currencies || []
   const categories = summary?.categories || []
 
@@ -202,17 +237,36 @@ export default function Expenses() {
             <table className="w-full text-sm min-w-[650px]">
               <thead>
                 <tr className="border-b border-border text-text-muted text-xs uppercase tracking-wider">
-                  <th className="text-left p-3 pl-4">Expense</th>
-                  <th className="text-left p-3">Category</th>
-                  <th className="text-left p-3">Currency</th>
-                  <th className="text-right p-3">Amount</th>
-                  <th className="text-right p-3">Frequency</th>
-                  <th className="text-right p-3">Monthly</th>
-                  <th className="text-right p-3 pr-4"></th>
+                  {[
+                    { key: 'label', label: 'Expense', align: 'left', pl: true },
+                    { key: 'category', label: 'Category', align: 'left' },
+                    { key: 'currency', label: 'Currency', align: 'left' },
+                    { key: 'amount', label: 'Amount', align: 'right' },
+                    { key: 'frequency', label: 'Frequency', align: 'right' },
+                    { key: 'monthly', label: 'Monthly', align: 'right' },
+                  ].map((col) => (
+                    <th
+                      key={col.key}
+                      onClick={() => handleSort(col.key)}
+                      className={`p-3 cursor-pointer select-none hover:text-text transition-colors ${
+                        col.align === 'left' ? 'text-left' : 'text-right'
+                      } ${col.pl ? 'pl-4' : ''}`}
+                    >
+                      <span className="inline-flex items-center gap-1">
+                        {col.label}
+                        {sortKey === col.key && (
+                          <svg width="8" height="10" viewBox="0 0 8 10" fill="currentColor" className="text-accent">
+                            {sortDir === 'asc' ? <path d="M4 1L7.5 5.5H0.5z" /> : <path d="M4 9L0.5 4.5H7.5z" />}
+                          </svg>
+                        )}
+                      </span>
+                    </th>
+                  ))}
+                  <th className="p-3 pr-4"></th>
                 </tr>
               </thead>
               <tbody>
-                {expenses.map((e) => {
+                {sortedExpenses.map((e) => {
                   const sym = currencySymbol(e.currency)
                   const annual = e.frequency === 'weekly' ? e.amount * 52 :
                     e.frequency === 'biweekly' ? e.amount * 26 :

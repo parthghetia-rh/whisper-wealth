@@ -8,8 +8,6 @@ import RefreshSelector from '../components/RefreshSelector'
 import PortfolioHistory from '../components/PortfolioHistory'
 import { convertAmount, formatCurrency } from '../utils/currency'
 import AllocationBreakdown from '../components/AllocationBreakdown'
-import DailySnapshot from '../components/DailySnapshot'
-import { MilestoneBanner, MilestoneChips, UpcomingMilestones } from '../components/MilestoneCard'
 
 const HIDDEN = '••••••'
 
@@ -93,9 +91,6 @@ export default function Dashboard() {
         <WelcomeBanner />
       )}
 
-      <DailySnapshot displayCurrency={displayCurrency} showValues={showValues} />
-      <MilestoneBanner />
-
       {currencies.length > 0 && (
         <>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -170,20 +165,6 @@ export default function Dashboard() {
           />
         </div>
       )}
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div>
-          <h3 className="text-sm font-medium text-text-muted mb-3">
-            <Link to="/milestones" className="hover:text-accent transition-colors">
-              Achievements
-            </Link>
-          </h3>
-          <div className="bg-surface-2 rounded-xl border border-border p-4 space-y-3">
-            <MilestoneChips />
-            <UpcomingMilestones />
-          </div>
-        </div>
-      </div>
 
       <div>
         <h3 className="text-sm font-medium text-text-muted mb-3">Holdings</h3>
