@@ -12,6 +12,7 @@ import cashRouter from './routes/cash.js'
 import watchlistRouter from './routes/watchlist.js'
 import settingsRouter from './routes/settings.js'
 import milestonesRouter from './routes/milestones.js'
+import expensesRouter from './routes/expenses.js'
 import { startPoller } from './services/poller.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -50,6 +51,7 @@ app.use('/api/cash', cashRouter)
 app.use('/api/watchlist', watchlistRouter)
 app.use('/api/settings', settingsRouter)
 app.use('/api/milestones', milestonesRouter)
+app.use('/api/expenses', expensesRouter)
 
 app.all('/api/*', (req, res) => {
   res.status(404).json({ error: 'Not found' })

@@ -7,6 +7,7 @@ const DEFAULT_NAV = [
   { to: '/transactions', label: 'Transactions', icon: 'transactions', short: 'Trade' },
   { to: '/dividends', label: 'Dividends', icon: 'dividends', short: 'Divs' },
   { to: '/cash', label: 'Sitting Cash', icon: 'cash', short: 'Cash' },
+  { to: '/expenses', label: 'Expenses', icon: 'expenses', short: 'Bills' },
   { to: '/watchlist', label: 'Watchlist', icon: 'watchlist', short: 'Watch' },
 ]
 
@@ -14,6 +15,7 @@ const ICONS = {
   dashboard: DashboardIcon,
   transactions: TransactionsIcon,
   dividends: DividendsIcon,
+  expenses: ExpensesIcon,
   cash: CashIcon,
   watchlist: WatchlistIcon,
 }
@@ -467,6 +469,15 @@ function SettingsIcon() {
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
       <circle cx="8" cy="8" r="2" />
       <path d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2M3.3 3.3l1.4 1.4M11.3 11.3l1.4 1.4M3.3 12.7l1.4-1.4M11.3 4.7l1.4-1.4" />
+    </svg>
+  )
+}
+
+function ExpensesIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M2 4h12M2 8h8M2 12h5" />
+      <path d="M12 9v5M10 12h4" />
     </svg>
   )
 }

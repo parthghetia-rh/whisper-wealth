@@ -99,6 +99,18 @@ db.run(`
 `)
 
 db.run(`
+  CREATE TABLE IF NOT EXISTS expenses (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    label TEXT NOT NULL,
+    category TEXT NOT NULL DEFAULT 'other',
+    currency TEXT NOT NULL DEFAULT 'CAD',
+    amount REAL NOT NULL,
+    frequency TEXT NOT NULL DEFAULT 'monthly',
+    created_at TEXT DEFAULT (datetime('now'))
+  )
+`)
+
+db.run(`
   CREATE TABLE IF NOT EXISTS milestones (
     id TEXT PRIMARY KEY,
     category TEXT NOT NULL,
