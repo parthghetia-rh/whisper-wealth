@@ -15,18 +15,9 @@ export default function AllocationBreakdown({
   holdings,
   rates,
   displayCurrency,
+  showValues = true,
 }) {
   const navigate = useNavigate()
-
-  const [showValues, setShowValues] = useState(() => {
-    return localStorage.getItem('portfolio-show-values') !== 'false'
-  })
-
-  const toggle = () => {
-    const next = !showValues
-    setShowValues(next)
-    localStorage.setItem('portfolio-show-values', String(next))
-  }
 
   if (!holdings?.length) return null
 
@@ -54,18 +45,6 @@ export default function AllocationBreakdown({
 
   return (
     <div className="bg-surface-2 rounded-xl border border-border p-5">
-      <div className="flex items-center justify-between mb-4">
-        <div />
-        <button
-          onClick={toggle}
-          className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs text-text-muted hover:text-text hover:bg-surface-3 transition-colors"
-          title={showValues ? 'Hide values' : 'Show values'}
-        >
-          {showValues ? <EyeIcon /> : <EyeOffIcon />}
-          {showValues ? 'Hide values' : 'Show values'}
-        </button>
-      </div>
-
       <div className="flex flex-col md:flex-row gap-6">
         <div className="w-full md:w-56 shrink-0 flex items-center justify-center">
           <ResponsiveContainer width="100%" height={200}>
@@ -164,19 +143,3 @@ function ChartTooltip({ active, payload, displayCurrency, showValues }) {
   )
 }
 
-function EyeIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M1 7s2.5-4 6-4 6 4 6 4-2.5 4-6 4-6-4-6-4z" />
-      <circle cx="7" cy="7" r="2" />
-    </svg>
-  )
-}
-
-function EyeOffIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M2 2l10 10M5.6 5.6a2 2 0 002.8 2.8M1 7s2.5-4 6-4c.8 0 1.5.2 2.2.5M13 7s-1.2 1.9-3 3" />
-    </svg>
-  )
-}

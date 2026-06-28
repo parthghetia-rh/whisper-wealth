@@ -22,24 +22,6 @@ export default function Settings() {
 
       <div className="space-y-4">
         <div className="bg-surface-2 rounded-xl border border-border p-5">
-          <h3 className="text-sm font-medium mb-4">Dividend Reinvestment (DRIP)</h3>
-          <div className="space-y-4">
-            <ToggleRow
-              label="Enable DRIP"
-              description="Automatically reinvest dividends by creating buy transactions when dividends are paid. Uses the current stock price at the time dividends are detected."
-              enabled={settings.drip_enabled === 'true'}
-              onToggle={() => toggle('drip_enabled')}
-            />
-            <ToggleRow
-              label="Allow fractional shares"
-              description="When enabled, DRIP buys exact fractional shares (e.g., 0.347 shares). When disabled, rounds down to whole shares — any remainder is not reinvested."
-              enabled={settings.fractional_shares === 'true'}
-              onToggle={() => toggle('fractional_shares')}
-            />
-          </div>
-        </div>
-
-        <div className="bg-surface-2 rounded-xl border border-border p-5">
           <h3 className="text-sm font-medium mb-4">Sitting Cash</h3>
           <ToggleRow
             label="Compound interest"

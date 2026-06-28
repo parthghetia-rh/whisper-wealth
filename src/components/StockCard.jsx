@@ -1,9 +1,12 @@
 import { currencySymbol } from '../utils/currency'
 
-export default function StockCard({ item, onClick, variant = 'holding', hasAction }) {
+const HIDDEN = '••••••'
+
+export default function StockCard({ item, onClick, variant = 'holding', hasAction, showValues = true }) {
   const isHolding = variant === 'holding'
   const sym = currencySymbol(item.currency || 'USD')
   const up = (item.change ?? item.change_percent ?? 0) >= 0
+  const sv = (val) => showValues ? val : HIDDEN
 
   return (
     <div
@@ -26,6 +29,9 @@ export default function StockCard({ item, onClick, variant = 'holding', hasActio
             <div className="text-sm font-semibold tabular-nums">
               {sym}{(item.current_price ?? item.price ?? 0).toFixed(2)}
             </div>
+            {item.market_state && item.market_state !== 'REGULAR' && (
+              <ExtendedHoursCompact item={item} sym={sym} />
+            )}
           </div>
         </div>
 
@@ -36,7 +42,7 @@ export default function StockCard({ item, onClick, variant = 'holding', hasActio
           <div className="flex items-center gap-2">
             {isHolding && item.gain_loss != null && (
               <span className={`text-[11px] tabular-nums ${item.gain_loss >= 0 ? 'text-green' : 'text-red'}`}>
-                {item.gain_loss >= 0 ? '+' : ''}{sym}{Math.abs(item.gain_loss).toFixed(2)}
+                {sv(`${item.gain_loss >= 0 ? '+' : ''}${sym}${Math.abs(item.gain_loss).toFixed(2)}`)}
               </span>
             )}
             <span
@@ -70,12 +76,31 @@ export default function StockCard({ item, onClick, variant = 'holding', hasActio
 
         {isHolding && (
           <div className="flex gap-3 mt-1.5 text-[10px] text-text-muted tabular-nums">
-            <span>{item.shares} shares</span>
-            <span>Avg {sym}{item.avg_cost?.toFixed(2)}</span>
+            <span>{sv(`${item.shares} shares`)}</span>
+            <span>{sv(`Avg ${sym}${item.avg_cost?.toFixed(2)}`)}</span>
             {item.dividend_yield > 0 && <span>Yield {item.dividend_yield.toFixed(2)}%</span>}
           </div>
         )}
       </div>
+    </div>
+  )
+}
+
+function ExtendedHoursCompact({ item, sym }) {
+  const isPre = item.market_state === 'PRE'
+  const price = isPre ? item.pre_market_price : item.post_market_price
+  const pct = isPre ? item.pre_market_change_percent : item.post_market_change_percent
+  if (!price) return null
+  const ehUp = (pct ?? 0) >= 0
+  return (
+    <div className="flex items-center gap-1 justify-end mt-0.5">
+      <span className="text-[9px] text-text-muted">{isPre ? 'Pre' : 'AH'}</span>
+      <span className="text-[10px] tabular-nums text-text-muted">{sym}{price.toFixed(2)}</span>
+      {pct != null && (
+        <span className={`text-[9px] tabular-nums ${ehUp ? 'text-green/70' : 'text-red/70'}`}>
+          {ehUp ? '+' : ''}{pct.toFixed(2)}%
+        </span>
+      )}
     </div>
   )
 }

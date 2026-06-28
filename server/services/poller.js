@@ -1,6 +1,5 @@
 import db, { stmtAll, stmtRun, stmtRunBatch, stmtGet, save } from '../db.js'
 import { getQuotes, getDividendHistory, getExchangeRates } from './stockService.js'
-import { getSettingBool } from '../routes/settings.js'
 
 const POLL_INTERVAL = 5 * 60 * 1000
 const MAX_SSE_CLIENTS = 20
@@ -23,65 +22,15 @@ function broadcast(data) {
   }
 }
 
-function getSharesHeld(ticker) {
-  const txns = stmtAll(
-    'SELECT type, shares FROM transactions WHERE ticker = ?',
-    [ticker]
-  )
-  let total = 0
-  for (const t of txns) {
-    total += t.type === 'buy' ? t.shares : -t.shares
+function cleanupDRIP() {
+  const count = stmtAll("SELECT COUNT(*) as c FROM transactions WHERE source = 'drip'")[0]?.c || 0
+  if (count > 0) {
+    stmtRun("DELETE FROM transactions WHERE source = 'drip'")
+    console.log(`Cleaned up ${count} DRIP transaction(s)`)
   }
-  return Math.max(0, total)
-}
-
-function processDRIP() {
-  const fractional = getSettingBool('fractional_shares')
-  const unprocessed = stmtAll(
-    'SELECT * FROM dividends WHERE drip_processed = 0 OR drip_processed IS NULL'
-  )
-
-  if (!unprocessed.length) return
-
-  let created = 0
-  for (const div of unprocessed) {
-    const shares = getSharesHeld(div.ticker)
-    if (shares <= 0) {
-      stmtRunBatch('UPDATE dividends SET drip_processed = 1 WHERE id = ?', [div.id])
-      continue
-    }
-
-    const quote = stmtGet('SELECT price FROM quotes WHERE ticker = ?', [div.ticker])
-    const price = quote?.price
-    if (!price || price <= 0) {
-      continue
-    }
-
-    const payout = shares * div.amount
-    let sharesToBuy = payout / price
-    if (!fractional) {
-      sharesToBuy = Math.floor(sharesToBuy)
-    } else {
-      sharesToBuy = Math.round(sharesToBuy * 10000) / 10000
-    }
-
-    if (sharesToBuy > 0) {
-      stmtRunBatch(
-        "INSERT INTO transactions (ticker, type, shares, price_per_share, date, source) VALUES (?, 'buy', ?, ?, ?, 'drip')",
-        [div.ticker, sharesToBuy, price, div.ex_date]
-      )
-      created++
-    }
-
-    stmtRunBatch('UPDATE dividends SET drip_processed = 1 WHERE id = ?', [div.id])
-  }
-
-  if (created > 0) {
-    save()
-    console.log(`DRIP: created ${created} reinvestment transaction(s)`)
-  } else if (unprocessed.length > 0) {
-    save()
-  }
+  try {
+    stmtRun("DELETE FROM settings WHERE key IN ('drip_enabled', 'fractional_shares')")
+  } catch {}
 }
 
 function getUniqueTickers() {
@@ -126,10 +75,6 @@ async function poll() {
         // ignore duplicate
       }
     }
-  }
-
-  if (getSettingBool('drip_enabled')) {
-    processDRIP()
   }
 
   const quoteCurrencies = quotes.map((q) => q.currency)
@@ -192,6 +137,7 @@ function syncPortfolioToWatchlist() {
 }
 
 export function startPoller() {
+  cleanupDRIP()
   syncPortfolioToWatchlist()
   poll().catch((err) => console.error('Initial poll failed:', err.message))
   setInterval(() => {

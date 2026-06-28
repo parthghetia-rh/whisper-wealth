@@ -225,22 +225,15 @@ export default function Transactions() {
                       </td>
                       <td className="p-3 font-medium">{t.ticker}</td>
                       <td className="p-3">
-                        <div className="flex items-center gap-1.5">
-                          <span
-                            className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${
-                              t.type === 'buy'
-                                ? 'bg-green/15 text-green'
-                                : 'bg-red/15 text-red'
-                            }`}
-                          >
-                            {t.type.toUpperCase()}
-                          </span>
-                          {t.source === 'drip' && (
-                            <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium bg-accent/15 text-accent">
-                              DRIP
-                            </span>
-                          )}
-                        </div>
+                        <span
+                          className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${
+                            t.type === 'buy'
+                              ? 'bg-green/15 text-green'
+                              : 'bg-red/15 text-red'
+                          }`}
+                        >
+                          {t.type.toUpperCase()}
+                        </span>
                       </td>
                       <td className="text-right p-3 tabular-nums">{t.shares}</td>
                       <td className="text-right p-3 tabular-nums">

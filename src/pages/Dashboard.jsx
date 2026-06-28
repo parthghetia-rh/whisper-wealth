@@ -9,8 +9,21 @@ import PortfolioHistory from '../components/PortfolioHistory'
 import { convertAmount, formatCurrency } from '../utils/currency'
 import AllocationBreakdown from '../components/AllocationBreakdown'
 
+const HIDDEN = '••••••'
+
 export default function Dashboard() {
   const [historyMode, setHistoryMode] = useState(null)
+  const [showValues, setShowValues] = useState(() => {
+    return localStorage.getItem('portfolio-show-values') !== 'false'
+  })
+
+  const toggleValues = () => {
+    const next = !showValues
+    setShowValues(next)
+    localStorage.setItem('portfolio-show-values', String(next))
+  }
+
+  const v = (val) => showValues ? val : HIDDEN
   const { data: summary, refetch: refetchSummary } = useApi('/api/portfolio/summary')
   const { data: holdings, refetch: refetchHoldings } = useApi('/api/portfolio')
   const { data: ratesData, refetch: refetchRates } = useApi('/api/portfolio/rates')
@@ -55,6 +68,14 @@ export default function Dashboard() {
           <p className="text-sm text-text-muted mt-0.5">Portfolio overview</p>
         </div>
         <div className="flex items-center gap-4 flex-wrap">
+          <button
+            onClick={toggleValues}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs text-text-muted hover:text-text hover:bg-surface-3 transition-colors"
+            title={showValues ? 'Hide values' : 'Show values'}
+          >
+            {showValues ? <EyeIcon /> : <EyeOffIcon />}
+            {showValues ? 'Hide' : 'Show'}
+          </button>
           <RefreshSelector onTick={refetchAll} />
           {availableCurrencies.length > 1 && (
             <CurrencySelector
@@ -75,24 +96,24 @@ export default function Dashboard() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <SummaryCard
               label="Portfolio Value"
-              value={formatCurrency(combined.total_value, displayCurrency)}
+              value={v(formatCurrency(combined.total_value, displayCurrency))}
               sub={`${combined.positions} position${combined.positions !== 1 ? 's' : ''}`}
               onClick={() => setHistoryMode(historyMode === 'value' ? null : 'value')}
             />
             <SummaryCard
               label="Total Gain/Loss"
-              value={`${total_gain >= 0 ? '+' : ''}${formatCurrency(total_gain, displayCurrency)}`}
-              sub={`${total_gain_percent >= 0 ? '+' : ''}${total_gain_percent.toFixed(2)}%`}
+              value={v(`${total_gain >= 0 ? '+' : ''}${formatCurrency(total_gain, displayCurrency)}`)}
+              sub={v(`${total_gain_percent >= 0 ? '+' : ''}${total_gain_percent.toFixed(2)}%`)}
               color={total_gain >= 0 ? 'green' : 'red'}
               onClick={() => setHistoryMode(historyMode === 'gain' ? null : 'gain')}
             />
             <SummaryCard
               label="Cost Basis"
-              value={formatCurrency(combined.total_cost, displayCurrency)}
+              value={v(formatCurrency(combined.total_cost, displayCurrency))}
             />
             <SummaryCard
               label="Yield"
-              value={`${portfolio_yield.toFixed(2)}%`}
+              value={v(`${portfolio_yield.toFixed(2)}%`)}
               color={portfolio_yield > 0 ? 'green' : undefined}
             />
           </div>
@@ -112,17 +133,17 @@ export default function Dashboard() {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <SummaryCard
                 label="Weekly"
-                value={formatCurrency(combined.annual_dividends / 52, displayCurrency)}
+                value={v(formatCurrency(combined.annual_dividends / 52, displayCurrency))}
                 color="green"
               />
               <SummaryCard
                 label="Monthly"
-                value={formatCurrency(combined.annual_dividends / 12, displayCurrency)}
+                value={v(formatCurrency(combined.annual_dividends / 12, displayCurrency))}
                 color="green"
               />
               <SummaryCard
                 label="Yearly"
-                value={formatCurrency(combined.annual_dividends, displayCurrency)}
+                value={v(formatCurrency(combined.annual_dividends, displayCurrency))}
                 color="green"
               />
             </div>
@@ -140,13 +161,14 @@ export default function Dashboard() {
             holdings={holdings}
             rates={rates}
             displayCurrency={displayCurrency}
+            showValues={showValues}
           />
         </div>
       )}
 
       <div>
         <h3 className="text-sm font-medium text-text-muted mb-3">Holdings</h3>
-        <HoldingsTable holdings={holdings} />
+        <HoldingsTable holdings={holdings} showValues={showValues} />
       </div>
     </div>
   )
@@ -268,5 +290,22 @@ function SummaryCard({ label, value, sub, color, onClick }) {
         </div>
       )}
     </div>
+  )
+}
+
+function EyeIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M1 7s2.5-4 6-4 6 4 6 4-2.5 4-6 4-6-4-6-4z" />
+      <circle cx="7" cy="7" r="2" />
+    </svg>
+  )
+}
+
+function EyeOffIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M2 2l10 10M5.6 5.6a2 2 0 002.8 2.8M1 7s2.5-4 6-4c.8 0 1.5.2 2.2.5M13 7s-1.2 1.9-3 3" />
+    </svg>
   )
 }

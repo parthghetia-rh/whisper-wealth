@@ -24,6 +24,13 @@ export async function getQuotes(tickers) {
         dividend_yield: quote.trailingAnnualDividendYield
           ? quote.trailingAnnualDividendYield * 100
           : 0,
+        market_state: quote.marketState ?? null,
+        pre_market_price: quote.preMarketPrice ?? null,
+        pre_market_change: quote.preMarketChange ?? null,
+        pre_market_change_percent: quote.preMarketChangePercent ?? null,
+        post_market_price: quote.postMarketPrice ?? null,
+        post_market_change: quote.postMarketChange ?? null,
+        post_market_change_percent: quote.postMarketChangePercent ?? null,
       })
     } catch (err) {
       console.error(`Failed to fetch quote for ${ticker}:`, err.message)

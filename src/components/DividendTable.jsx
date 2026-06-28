@@ -64,7 +64,8 @@ export default function DividendTable({ holdings }) {
 
       {sorted.map((h) => {
         const sym = currencySymbol(h.currency)
-        const yahooUrl = `https://finance.yahoo.com/quote/${encodeURIComponent(h.ticker)}/dividends/`
+        const baseTicker = h.ticker.split('.')[0]
+        const divHistoryUrl = `https://dividendhistory.org/payout/${encodeURIComponent(baseTicker)}/`
         return (
           <div
             key={h.ticker}
@@ -74,7 +75,7 @@ export default function DividendTable({ holdings }) {
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-4 gap-3">
               <div>
                 <a
-                  href={yahooUrl}
+                  href={divHistoryUrl}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="font-medium hover:text-accent transition-colors inline-flex items-center gap-1"

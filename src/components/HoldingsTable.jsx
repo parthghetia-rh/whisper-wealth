@@ -22,7 +22,9 @@ const SORT_OPTIONS = [
   { key: 'ticker', label: 'Ticker' },
 ]
 
-export default function HoldingsTable({ holdings }) {
+const HIDDEN = '••••••'
+
+export default function HoldingsTable({ holdings, showValues = true }) {
   const [sortKey, setSortKey] = useState(null)
   const [sortDir, setSortDir] = useState('desc')
 
@@ -101,7 +103,7 @@ export default function HoldingsTable({ holdings }) {
             {/* Mobile: card view */}
             <div className="md:hidden space-y-2">
               {items.map((h) => (
-                <StockCard key={h.ticker} item={h} variant="holding" />
+                <StockCard key={h.ticker} item={h} variant="holding" showValues={showValues} />
               ))}
             </div>
 
@@ -140,9 +142,9 @@ export default function HoldingsTable({ holdings }) {
                           {h.name}
                         </div>
                       </td>
-                      <td className="text-right p-3 tabular-nums">{h.shares}</td>
+                      <td className="text-right p-3 tabular-nums">{showValues ? h.shares : HIDDEN}</td>
                       <td className="text-right p-3 tabular-nums">
-                        {sym}{h.avg_cost.toFixed(2)}
+                        {showValues ? `${sym}${h.avg_cost.toFixed(2)}` : HIDDEN}
                       </td>
                       <td className="text-right p-3 tabular-nums font-medium">
                         {sym}{h.current_price.toFixed(2)}
@@ -154,18 +156,20 @@ export default function HoldingsTable({ holdings }) {
                         </span>
                       </td>
                       <td className="text-right p-3 tabular-nums font-medium">
-                        {sym}{h.market_value.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                        {showValues ? `${sym}${h.market_value.toLocaleString('en-US', { minimumFractionDigits: 2 })}` : HIDDEN}
                       </td>
                       <td className="text-right p-3 tabular-nums">
-                        <span className={h.gain_loss >= 0 ? 'text-green' : 'text-red'}>
-                          {h.gain_loss >= 0 ? '+' : ''}{sym}
-                          {Math.abs(h.gain_loss).toLocaleString('en-US', {
-                            minimumFractionDigits: 2,
-                          })}
-                          <span className="text-xs ml-1">
-                            ({h.gain_loss_percent.toFixed(2)}%)
+                        {showValues ? (
+                          <span className={h.gain_loss >= 0 ? 'text-green' : 'text-red'}>
+                            {h.gain_loss >= 0 ? '+' : ''}{sym}
+                            {Math.abs(h.gain_loss).toLocaleString('en-US', {
+                              minimumFractionDigits: 2,
+                            })}
+                            <span className="text-xs ml-1">
+                              ({h.gain_loss_percent.toFixed(2)}%)
+                            </span>
                           </span>
-                        </span>
+                        ) : HIDDEN}
                       </td>
                       <td className="text-right p-3 pr-4 tabular-nums text-text-muted">
                         {h.dividend_yield.toFixed(2)}%

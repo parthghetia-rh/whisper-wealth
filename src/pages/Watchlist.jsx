@@ -322,7 +322,10 @@ export default function Watchlist() {
                           </div>
                         </td>
                         <td className="p-3 text-text-muted text-xs truncate max-w-[150px]">{q.name}</td>
-                        <td className="text-right p-3 tabular-nums font-medium">{sym}{q.price.toFixed(2)}</td>
+                        <td className="text-right p-3">
+                          <div className="tabular-nums font-medium">{sym}{q.price.toFixed(2)}</div>
+                          <ExtendedHours quote={q} sym={sym} />
+                        </td>
                         <td className="text-right p-3"><PctBadge value={q.change_percent} /></td>
                         <td className="text-right p-3"><PctBadge value={pc?.['3m']} /></td>
                         <td className="text-right p-3"><PctBadge value={pc?.['6m']} /></td>
@@ -381,6 +384,26 @@ function SortArrow({ dir }) {
         <path d="M4 9L0.5 4.5H7.5z" />
       )}
     </svg>
+  )
+}
+
+function ExtendedHours({ quote: q, sym }) {
+  if (!q.market_state || q.market_state === 'REGULAR') return null
+  const isPre = q.market_state === 'PRE'
+  const price = isPre ? q.pre_market_price : q.post_market_price
+  const pct = isPre ? q.pre_market_change_percent : q.post_market_change_percent
+  if (!price) return null
+  const ehUp = (pct ?? 0) >= 0
+  return (
+    <div className="flex items-center gap-1 justify-end mt-0.5">
+      <span className="text-[9px] text-text-muted">{isPre ? 'Pre' : 'AH'}</span>
+      <span className="text-[10px] tabular-nums text-text-muted">{sym}{price.toFixed(2)}</span>
+      {pct != null && (
+        <span className={`text-[9px] tabular-nums ${ehUp ? 'text-green/70' : 'text-red/70'}`}>
+          {ehUp ? '+' : ''}{pct.toFixed(2)}%
+        </span>
+      )}
+    </div>
   )
 }
 

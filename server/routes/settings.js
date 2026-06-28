@@ -4,8 +4,6 @@ import { stmtAll, stmtRun } from '../db.js'
 const router = Router()
 
 const DEFAULTS = {
-  drip_enabled: 'false',
-  fractional_shares: 'true',
   cash_interest_compound: 'false',
 }
 
@@ -22,7 +20,7 @@ router.get('/', (req, res) => {
   const rows = stmtAll('SELECT * FROM settings')
   const settings = { ...DEFAULTS }
   for (const r of rows) {
-    settings[r.key] = r.value
+    if (r.key in DEFAULTS) settings[r.key] = r.value
   }
   res.json(settings)
 })
@@ -43,7 +41,7 @@ router.put('/', (req, res) => {
   const rows = stmtAll('SELECT * FROM settings')
   const settings = { ...DEFAULTS }
   for (const r of rows) {
-    settings[r.key] = r.value
+    if (r.key in DEFAULTS) settings[r.key] = r.value
   }
   res.json(settings)
 })
