@@ -12,9 +12,9 @@ const EXCHANGE_SUFFIX = {
 
 const TICKER_RE = /^[A-Z0-9.\-]{1,20}$/
 
-const PATTERNS = [
+const INLINE_PATTERNS = [
   {
-    name: 'wealthsimple',
+    name: 'wealthsimple-inline',
     regex: /(?:you\s+)?(?<type>bought|sold)\s+(?<shares>[\d,.]+)\s+(?:units?\s+of\s+)?(?<ticker>[A-Z0-9.\-]+)\s+(?:at|@)\s+\$?(?<price>[\d,.]+)/gi,
   },
   {
@@ -22,16 +22,8 @@ const PATTERNS = [
     regex: /(?:order\s+executed|filled)[:\s\-]*(?<type>buy|sell)\s+(?<shares>[\d,.]+)\s+(?<ticker>[A-Z0-9.\-]+)\s+(?:@|at)\s+\$?(?<price>[\d,.]+)/gi,
   },
   {
-    name: 'td',
-    regex: /(?<type>buy|sell|bought|sold)\s+(?<shares>[\d,.]+)\s+(?:shares?\s+(?:of\s+)?)?(?<ticker>[A-Z0-9.\-]+)\s+(?:at|@|price:?\s*)\s*\$?(?<price>[\d,.]+)/gi,
-  },
-  {
-    name: 'generic-buy-sell',
+    name: 'generic-inline',
     regex: /(?<type>buy|sell|bought|sold|purchase[d]?)\s+(?<shares>[\d,.]+)\s+(?:shares?\s+(?:of\s+)?)?(?<ticker>[A-Z0-9.\-]+)\s+(?:at|@)\s+\$?(?<price>[\d,.]+)/gi,
-  },
-  {
-    name: 'generic-ticker-first',
-    regex: /(?<ticker>[A-Z][A-Z0-9.\-]{0,19})\s+(?<type>buy|sell|bought|sold)\s+(?<shares>[\d,.]+)\s+(?:shares?\s+)?(?:at|@)\s+\$?(?<price>[\d,.]+)/gi,
   },
 ]
 
@@ -42,7 +34,7 @@ const DATE_PATTERNS = [
 ]
 
 function parseAmount(val) {
-  return Number(val.replace(/,/g, ''))
+  return Number(val.replace(/[,\s]/g, ''))
 }
 
 function normalizeDate(val) {
@@ -71,26 +63,48 @@ function extractDates(text) {
   return [...new Set(dates)].sort().reverse()
 }
 
-function resolveTickerSuffix(ticker) {
-  if (ticker.includes('.')) return ticker
-  return ticker
-}
+function parseBlockFormat(text) {
+  const transactions = []
 
-export async function parsePDF(buffer) {
-  const data = await pdfParse(buffer)
-  const text = data.text
+  const blockRegex = /Type:\s*(?:Limit\s+|Market\s+)?(?<type>Buy|Sell)\s*\n\s*Symbol:\s*(?<ticker>[A-Z0-9.\-]+)\s*\n\s*Shares:\s*(?<shares>[\d,.]+)\s*\n\s*(?:Average\s+price|Price):\s*\$?(?<price>[\d,.]+)/gi
 
-  if (!text || text.trim().length < 10) {
-    return { transactions: [], rawText: '', error: 'Could not extract text from PDF. The file may be a scanned image.' }
+  let match
+  while ((match = blockRegex.exec(text)) !== null) {
+    const g = match.groups
+    if (!g) continue
+
+    const type = g.type.toLowerCase() === 'buy' ? 'buy' : 'sell'
+    const ticker = g.ticker.toUpperCase()
+    const shares = parseAmount(g.shares)
+    const price = parseAmount(g.price)
+
+    if (!TICKER_RE.test(ticker)) continue
+    if (!Number.isFinite(shares) || shares <= 0) continue
+    if (!Number.isFinite(price) || price <= 0) continue
+
+    const nearbyText = text.substring(
+      Math.max(0, match.index - 300),
+      match.index + match[0].length + 300
+    )
+    const nearbyDates = extractDates(nearbyText)
+
+    transactions.push({
+      ticker,
+      type,
+      shares,
+      price_per_share: Math.round(price * 10000) / 10000,
+      date: nearbyDates[0] || null,
+      source: 'wealthsimple-block',
+    })
   }
 
-  const dates = extractDates(text)
-  const fallbackDate = dates[0] || new Date().toISOString().split('T')[0]
+  return transactions
+}
 
+function parseInlineFormat(text) {
   const transactions = []
-  const seen = new Set()
 
-  for (const pattern of PATTERNS) {
+  for (const pattern of INLINE_PATTERNS) {
     pattern.regex.lastIndex = 0
     let match
     while ((match = pattern.regex.exec(text)) !== null) {
@@ -99,7 +113,7 @@ export async function parsePDF(buffer) {
 
       const rawType = g.type.toLowerCase()
       const type = /buy|bought|purchase/.test(rawType) ? 'buy' : 'sell'
-      const ticker = resolveTickerSuffix(g.ticker.toUpperCase())
+      const ticker = g.ticker.toUpperCase()
       const shares = parseAmount(g.shares)
       const price = parseAmount(g.price)
 
@@ -107,29 +121,61 @@ export async function parsePDF(buffer) {
       if (!Number.isFinite(shares) || shares <= 0) continue
       if (!Number.isFinite(price) || price <= 0) continue
 
-      const key = `${type}-${ticker}-${shares}-${price}`
-      if (seen.has(key)) continue
-      seen.add(key)
-
-      const nearbyText = text.substring(Math.max(0, match.index - 200), match.index + match[0].length + 200)
+      const nearbyText = text.substring(
+        Math.max(0, match.index - 300),
+        match.index + match[0].length + 300
+      )
       const nearbyDates = extractDates(nearbyText)
-      const date = nearbyDates[0] || fallbackDate
 
       transactions.push({
         ticker,
         type,
         shares,
         price_per_share: Math.round(price * 10000) / 10000,
-        date,
+        date: nearbyDates[0] || null,
         source: pattern.name,
       })
     }
   }
 
+  return transactions
+}
+
+export async function parsePDF(buffer) {
+  const data = await pdfParse(buffer)
+  const text = data.text
+
+  if (!text || text.trim().length < 10) {
+    return {
+      transactions: [],
+      skipped: [],
+      rawText: '',
+      error: 'Could not extract text from PDF. The file may be a scanned image.',
+    }
+  }
+
+  const allDates = extractDates(text)
+  const fallbackDate = allDates[0] || new Date().toISOString().split('T')[0]
+
+  const blockTxns = parseBlockFormat(text)
+  const inlineTxns = parseInlineFormat(text)
+
+  const seen = new Set()
+  const transactions = []
+
+  for (const t of [...blockTxns, ...inlineTxns]) {
+    const key = `${t.type}-${t.ticker}-${t.shares}-${t.price_per_share}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    if (!t.date) t.date = fallbackDate
+    transactions.push(t)
+  }
+
   return {
     transactions,
-    rawText: text.substring(0, 2000),
-    datesFound: dates,
+    skipped: [],
+    rawText: text.substring(0, 3000),
+    datesFound: allDates,
     patternsMatched: [...new Set(transactions.map((t) => t.source))],
   }
 }
