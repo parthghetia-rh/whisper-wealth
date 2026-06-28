@@ -107,7 +107,7 @@ export default function Layout({ onLogout }) {
           collapsed ? 'w-16' : 'w-56'
         }`}
       >
-        <div className={`border-b border-border ${collapsed ? 'p-3 flex justify-center' : 'p-5'}`}>
+        <NavLink to="/" className={`block border-b border-border ${collapsed ? 'p-3 flex justify-center' : 'p-5'} hover:bg-surface-3/30 transition-colors`}>
           {collapsed ? (
             <Logo size={28} />
           ) : (
@@ -123,7 +123,7 @@ export default function Layout({ onLogout }) {
               </div>
             </div>
           )}
-        </div>
+        </NavLink>
 
         <div className="flex-1 py-3 px-2 space-y-0.5 overflow-y-auto">
           {navItems.map(({ to, label, icon }, idx) => {
@@ -319,10 +319,10 @@ export default function Layout({ onLogout }) {
       <div className="flex-1 flex flex-col min-w-0">
         {/* Mobile top bar */}
         <div className="md:hidden flex items-center justify-between px-4 py-3 bg-surface-2 border-b border-border">
-          <div className="flex items-center gap-2">
+          <NavLink to="/" className="flex items-center gap-2">
             <Logo size={24} />
             <span className="text-sm font-semibold text-text">WhisperWealth</span>
-          </div>
+          </NavLink>
           <button
             onClick={() => setSettingsOpen(!settingsOpen)}
             className="p-1.5 text-text-muted hover:text-text"

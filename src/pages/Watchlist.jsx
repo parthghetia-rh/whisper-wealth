@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useApi, postApi, deleteApi } from '../hooks/useApi'
 import { currencySymbol } from '../utils/currency'
 import TickerChart from '../components/TickerChart'
@@ -34,7 +35,8 @@ export default function Watchlist() {
   const [lastRefresh, setLastRefresh] = useState(null)
   const [sortKey, setSortKey] = useState(null)
   const [sortDir, setSortDir] = useState('desc')
-  const [expandedTicker, setExpandedTicker] = useState(null)
+  const [searchParams, setSearchParams] = useSearchParams()
+  const [expandedTicker, setExpandedTicker] = useState(() => searchParams.get('ticker') || null)
   const [interval, setIntervalMs] = useState(() => {
     const saved = localStorage.getItem(STORAGE_KEY)
     return saved ? Number(saved) : 30_000

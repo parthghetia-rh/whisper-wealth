@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts'
 import { convertAmount, formatCurrency } from '../utils/currency'
 
@@ -15,6 +16,8 @@ export default function AllocationBreakdown({
   rates,
   displayCurrency,
 }) {
+  const navigate = useNavigate()
+
   const [showValues, setShowValues] = useState(() => {
     return localStorage.getItem('portfolio-show-values') !== 'false'
   })
@@ -78,7 +81,12 @@ export default function AllocationBreakdown({
                 paddingAngle={2}
               >
                 {items.map((entry, i) => (
-                  <Cell key={i} fill={entry.color} />
+                  <Cell
+                    key={i}
+                    fill={entry.color}
+                    className="cursor-pointer"
+                    onClick={() => navigate(`/watchlist?ticker=${entry.ticker}`)}
+                  />
                 ))}
               </Pie>
               <Tooltip
@@ -98,7 +106,8 @@ export default function AllocationBreakdown({
             {items.map((item) => (
               <div
                 key={item.ticker}
-                className="flex items-center gap-3 py-1.5 group"
+                onClick={() => navigate(`/watchlist?ticker=${item.ticker}`)}
+                className="flex items-center gap-3 py-1.5 group cursor-pointer hover:bg-surface-3/30 rounded-lg px-1 -mx-1 transition-colors"
               >
                 <div
                   className="w-2.5 h-2.5 rounded-full shrink-0"

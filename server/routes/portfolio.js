@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { stmtAll, stmtGet } from '../db.js'
 import { addSSEClient, triggerPoll, triggerQuickRefresh, getRates } from '../services/poller.js'
 import { getSettingBool } from './settings.js'
+import { getChartData } from '../services/stockService.js'
 
 const router = Router()
 
@@ -163,6 +164,49 @@ router.get('/summary', (req, res) => {
   })
 
   res.json({ currencies })
+})
+
+router.get('/history', async (req, res) => {
+  const range = ['1m', '3m', '6m', '1y'].includes(req.query.range) ? req.query.range : '1y'
+  const holdings = getHoldings()
+  if (!holdings.length) return res.json({ data: [], range })
+
+  try {
+    const allCharts = {}
+    for (const h of holdings) {
+      allCharts[h.ticker] = await getChartData(h.ticker, range)
+    }
+
+    const allDates = new Set()
+    for (const points of Object.values(allCharts)) {
+      for (const p of points) allDates.add(p.date)
+    }
+    const dates = [...allDates].sort()
+
+    const lastPrice = {}
+    const data = dates.map((date) => {
+      let totalValue = 0
+      let totalCost = 0
+      for (const h of holdings) {
+        const point = allCharts[h.ticker]?.find((p) => p.date === date)
+        if (point) lastPrice[h.ticker] = point.close
+        const price = lastPrice[h.ticker] || 0
+        totalValue += h.shares * price
+        totalCost += h.total_cost
+      }
+      return {
+        date,
+        value: Math.round(totalValue * 100) / 100,
+        cost: Math.round(totalCost * 100) / 100,
+        gain: Math.round((totalValue - totalCost) * 100) / 100,
+      }
+    })
+
+    res.json({ data, range })
+  } catch (err) {
+    console.error('Portfolio history failed:', err.message)
+    res.status(500).json({ error: 'Failed to load portfolio history' })
+  }
 })
 
 router.get('/rates', (req, res) => {

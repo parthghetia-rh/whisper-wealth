@@ -1,13 +1,16 @@
-import { Link } from 'react-router-dom'
+import { useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import { useApi } from '../hooks/useApi'
 import { useSSE } from '../hooks/useSSE'
 import HoldingsTable from '../components/HoldingsTable'
 import CurrencySelector, { useDisplayCurrency } from '../components/CurrencySelector'
 import RefreshSelector from '../components/RefreshSelector'
+import PortfolioHistory from '../components/PortfolioHistory'
 import { convertAmount, formatCurrency } from '../utils/currency'
 import AllocationBreakdown from '../components/AllocationBreakdown'
 
 export default function Dashboard() {
+  const [historyMode, setHistoryMode] = useState(null)
   const { data: summary, refetch: refetchSummary } = useApi('/api/portfolio/summary')
   const { data: holdings, refetch: refetchHoldings } = useApi('/api/portfolio')
   const { data: ratesData, refetch: refetchRates } = useApi('/api/portfolio/rates')
@@ -74,12 +77,14 @@ export default function Dashboard() {
               label="Portfolio Value"
               value={formatCurrency(combined.total_value, displayCurrency)}
               sub={`${combined.positions} position${combined.positions !== 1 ? 's' : ''}`}
+              onClick={() => setHistoryMode(historyMode === 'value' ? null : 'value')}
             />
             <SummaryCard
               label="Total Gain/Loss"
               value={`${total_gain >= 0 ? '+' : ''}${formatCurrency(total_gain, displayCurrency)}`}
               sub={`${total_gain_percent >= 0 ? '+' : ''}${total_gain_percent.toFixed(2)}%`}
               color={total_gain >= 0 ? 'green' : 'red'}
+              onClick={() => setHistoryMode(historyMode === 'gain' ? null : 'gain')}
             />
             <SummaryCard
               label="Cost Basis"
@@ -92,8 +97,16 @@ export default function Dashboard() {
             />
           </div>
 
-          <div>
-            <h3 className="text-sm font-medium text-text-muted mb-3">
+          {historyMode && (
+            <PortfolioHistory
+              displayCurrency={displayCurrency}
+              mode={historyMode}
+              onClose={() => setHistoryMode(null)}
+            />
+          )}
+
+          <Link to="/dividends" className="block group">
+            <h3 className="text-sm font-medium text-text-muted mb-3 group-hover:text-accent transition-colors">
               Projected Dividend Income
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -113,7 +126,7 @@ export default function Dashboard() {
                 color="green"
               />
             </div>
-          </div>
+          </Link>
 
         </>
       )}
@@ -221,9 +234,14 @@ function WelcomeBanner() {
   )
 }
 
-function SummaryCard({ label, value, sub, color }) {
+function SummaryCard({ label, value, sub, color, onClick }) {
   return (
-    <div className="bg-surface-2 rounded-xl border border-border p-4">
+    <div
+      onClick={onClick}
+      className={`bg-surface-2 rounded-xl border border-border p-4 ${
+        onClick ? 'cursor-pointer hover:border-accent/50 transition-colors' : ''
+      }`}
+    >
       <div className="text-xs text-text-muted mb-1">{label}</div>
       <div
         className={`text-lg font-semibold tabular-nums ${
