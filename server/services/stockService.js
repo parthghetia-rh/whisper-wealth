@@ -35,6 +35,7 @@ export async function getQuotes(tickers) {
         post_market_price: quote.postMarketPrice ?? null,
         post_market_change: quote.postMarketChange ?? null,
         post_market_change_percent: quote.postMarketChangePercent ?? null,
+        analyst_rating: quote.averageAnalystRating ?? null,
       })
     } catch (err) {
       console.error(`Failed to fetch quote for ${ticker}:`, err.message)

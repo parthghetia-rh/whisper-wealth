@@ -3,6 +3,8 @@ import { getQuotes, getDividendHistory, getExchangeRates } from './stockService.
 import { checkMilestones } from './milestones.js'
 
 const POLL_INTERVAL = 5 * 60 * 1000
+const HEAVY_POLL_INTERVAL = 6 * 60 * 60 * 1000
+let lastHeavyPoll = 0
 const MAX_SSE_CLIENTS = 20
 const sseClients = new Set()
 let latestRates = { USD: 1 }
@@ -64,30 +66,34 @@ async function poll() {
     )
   }
 
-  for (let i = 0; i < tickers.length; i++) {
-    if (i > 0 && i % 3 === 0) await new Promise((r) => setTimeout(r, 2000))
-    const ticker = tickers[i]
-    const divs = await getDividendHistory(ticker)
-    for (const d of divs) {
-      try {
-        stmtRun(
-          'INSERT OR IGNORE INTO dividends (ticker, amount, ex_date) VALUES (?, ?, ?)',
-          [d.ticker, d.amount, d.ex_date]
-        )
-      } catch {
-        // ignore duplicate
+  const needHeavyPoll = Date.now() - lastHeavyPoll > HEAVY_POLL_INTERVAL
+
+  if (needHeavyPoll) {
+    console.log('Running heavy poll (dividends, rates, snapshot)...')
+    for (let i = 0; i < tickers.length; i++) {
+      if (i > 0 && i % 3 === 0) await new Promise((r) => setTimeout(r, 2000))
+      const ticker = tickers[i]
+      const divs = await getDividendHistory(ticker)
+      for (const d of divs) {
+        try {
+          stmtRun(
+            'INSERT OR IGNORE INTO dividends (ticker, amount, ex_date) VALUES (?, ?, ?)',
+            [d.ticker, d.amount, d.ex_date]
+          )
+        } catch {}
       }
     }
-  }
 
-  const quoteCurrencies = quotes.map((q) => q.currency)
-  const cashCurrencies = stmtAll('SELECT DISTINCT currency FROM cash_positions').map((r) => r.currency)
-  const allCurrencies = [...new Set([...quoteCurrencies, ...cashCurrencies])]
-  if (allCurrencies.length) {
-    latestRates = await getExchangeRates(allCurrencies)
-  }
+    const quoteCurrencies = quotes.map((q) => q.currency)
+    const cashCurrencies = stmtAll('SELECT DISTINCT currency FROM cash_positions').map((r) => r.currency)
+    const allCurrencies = [...new Set([...quoteCurrencies, ...cashCurrencies])]
+    if (allCurrencies.length) {
+      latestRates = await getExchangeRates(allCurrencies)
+    }
 
-  takeSnapshot()
+    takeSnapshot()
+    lastHeavyPoll = Date.now()
+  }
 
   if (quotes.length) {
     broadcast({ type: 'quotes', data: quotes, rates: latestRates })

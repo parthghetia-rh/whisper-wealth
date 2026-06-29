@@ -166,38 +166,58 @@ router.get('/summary', (req, res) => {
   res.json({ currencies })
 })
 
+function calcChange(current, reference) {
+  if (!current || !reference || reference.total_value <= 0) return null
+  const diff = current.total_value - reference.total_value
+  return {
+    value: Math.round(diff * 100) / 100,
+    percent: Math.round((diff / reference.total_value) * 10000) / 100,
+  }
+}
+
 router.get('/snapshot', (req, res) => {
   const today = new Date().toISOString().split('T')[0]
   const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0]
+  const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0]
+  const monthAgo = new Date(Date.now() - 30 * 86400000).toISOString().split('T')[0]
 
   const todaySnap = stmtGet('SELECT * FROM portfolio_snapshots WHERE date = ?', [today])
-  const yesterdaySnap = stmtGet('SELECT * FROM portfolio_snapshots WHERE date = ?', [yesterday])
-
-  let change = null
-  if (todaySnap && yesterdaySnap && yesterdaySnap.total_value > 0) {
-    const diff = todaySnap.total_value - yesterdaySnap.total_value
-    change = {
-      value: Math.round(diff * 100) / 100,
-      percent: Math.round((diff / yesterdaySnap.total_value) * 10000) / 100,
-    }
-  }
+  const yesterdaySnap = stmtGet('SELECT * FROM portfolio_snapshots WHERE date <= ? ORDER BY date DESC LIMIT 1', [yesterday])
+  const weekSnap = stmtGet('SELECT * FROM portfolio_snapshots WHERE date <= ? ORDER BY date DESC LIMIT 1', [weekAgo])
+  const monthSnap = stmtGet('SELECT * FROM portfolio_snapshots WHERE date <= ? ORDER BY date DESC LIMIT 1', [monthAgo])
 
   const holdings = getHoldings()
   let topMover = null
   let worstMover = null
+  let dayGain = 0
   for (const h of holdings) {
     const quote = stmtGet('SELECT * FROM quotes WHERE ticker = ?', [h.ticker])
     if (!quote) continue
     const pct = quote.change_percent || 0
+    dayGain += h.shares * (quote.change || 0)
     if (!topMover || pct > topMover.change_percent) {
-      topMover = { ticker: h.ticker, name: quote.name, change_percent: pct }
+      topMover = { ticker: h.ticker, name: quote.name, change_percent: pct, change: quote.change || 0 }
     }
     if (!worstMover || pct < worstMover.change_percent) {
-      worstMover = { ticker: h.ticker, name: quote.name, change_percent: pct }
+      worstMover = { ticker: h.ticker, name: quote.name, change_percent: pct, change: quote.change || 0 }
     }
   }
 
-  res.json({ today: todaySnap, yesterday: yesterdaySnap, change, topMover, worstMover })
+  const totalValue = todaySnap?.total_value || 0
+  const dayGainPct = totalValue > 0 ? Math.round((dayGain / (totalValue - dayGain)) * 10000) / 100 : 0
+
+  res.json({
+    today: todaySnap,
+    day: {
+      value: Math.round(dayGain * 100) / 100,
+      percent: dayGainPct,
+    },
+    week: calcChange(todaySnap, weekSnap),
+    month: calcChange(todaySnap, monthSnap),
+    total: calcChange(todaySnap, yesterdaySnap),
+    topMover,
+    worstMover,
+  })
 })
 
 router.get('/history', async (req, res) => {

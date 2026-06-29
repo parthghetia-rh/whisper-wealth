@@ -8,6 +8,7 @@ import RefreshSelector from '../components/RefreshSelector'
 import PortfolioHistory from '../components/PortfolioHistory'
 import { convertAmount, formatCurrency } from '../utils/currency'
 import AllocationBreakdown from '../components/AllocationBreakdown'
+import PerformanceTracker from '../components/PerformanceTracker'
 
 const HIDDEN = '••••••'
 
@@ -90,6 +91,8 @@ export default function Dashboard() {
       {currencies.length === 0 && !holdings?.length && (
         <WelcomeBanner />
       )}
+
+      <PerformanceTracker displayCurrency={displayCurrency} showValues={showValues} />
 
       {currencies.length > 0 && (
         <>

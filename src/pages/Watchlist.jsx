@@ -24,6 +24,7 @@ const WL_COLUMNS = [
   { key: '6m', label: '6M', align: 'right', get: () => 0, getP: (p) => p?.['6m'] ?? null },
   { key: '1y', label: '1Y', align: 'right', get: () => 0, getP: (p) => p?.['1y'] ?? null },
   { key: 'dividend_yield', label: 'Yield', align: 'right', get: (q) => q?.dividend_yield ?? 0, getP: () => null },
+  { key: 'analyst_rating', label: 'Rating', align: 'center', get: (q) => q?.analyst_rating || '', getP: () => null },
 ]
 
 export default function Watchlist() {
@@ -40,6 +41,9 @@ export default function Watchlist() {
   const [customOrder, setCustomOrder] = useState(() => {
     try { return JSON.parse(localStorage.getItem('watchlist-order')) || null } catch { return null }
   })
+  const [flashEnabled, setFlashEnabled] = useState(() => localStorage.getItem('watchlist-flash') !== 'false')
+  const [prevPrices, setPrevPrices] = useState({})
+  const [flashing, setFlashing] = useState({})
   const [dragIdx, setDragIdx] = useState(null)
   const [overIdx, setOverIdx] = useState(null)
   const [interval, setIntervalMs] = useState(() => {
@@ -53,6 +57,25 @@ export default function Watchlist() {
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, String(interval))
   }, [interval])
+
+  useEffect(() => {
+    if (!flashEnabled || !data?.items) return
+    const newFlash = {}
+    const newPrices = {}
+    for (const item of data.items) {
+      const q = item.quote
+      if (!q) continue
+      newPrices[q.ticker] = q.price
+      if (prevPrices[q.ticker] != null && q.price !== prevPrices[q.ticker]) {
+        newFlash[q.ticker] = q.price > prevPrices[q.ticker] ? 'up' : 'down'
+      }
+    }
+    setPrevPrices(newPrices)
+    if (Object.keys(newFlash).length) {
+      setFlashing(newFlash)
+      setTimeout(() => setFlashing({}), 1500)
+    }
+  }, [data, flashEnabled])
 
   const doRefresh = useCallback(async () => {
     setRefreshing(true)
@@ -222,6 +245,17 @@ export default function Watchlist() {
               {lastRefresh.toLocaleTimeString()}
             </span>
           )}
+          <button
+            onClick={() => {
+              const next = !flashEnabled
+              setFlashEnabled(next)
+              localStorage.setItem('watchlist-flash', String(next))
+            }}
+            className={`text-[10px] transition-colors ${flashEnabled ? 'text-accent' : 'text-text-muted hover:text-accent'}`}
+            title={flashEnabled ? 'Disable flash' : 'Enable flash'}
+          >
+            Flash {flashEnabled ? 'ON' : 'OFF'}
+          </button>
           {customOrder && (
             <button
               onClick={resetOrder}
@@ -284,7 +318,7 @@ export default function Watchlist() {
                 <option value="ticker">Ticker</option>
               </select>
             </div>
-            {sortedItems.map((item) => {
+            {sortedItems.map((item, idx) => {
               const q = item.quote
               const isExpanded = expandedTicker === item.ticker
               if (!q) {
@@ -295,8 +329,30 @@ export default function Watchlist() {
                   </div>
                 )
               }
+              const moveUp = () => {
+                if (idx === 0) return
+                const list = sortedItems.map((i) => i.ticker)
+                ;[list[idx - 1], list[idx]] = [list[idx], list[idx - 1]]
+                setCustomOrder(list)
+                localStorage.setItem('watchlist-order', JSON.stringify(list))
+                setSortKey(null)
+              }
+              const moveDown = () => {
+                if (idx === sortedItems.length - 1) return
+                const list = sortedItems.map((i) => i.ticker)
+                ;[list[idx], list[idx + 1]] = [list[idx + 1], list[idx]]
+                setCustomOrder(list)
+                localStorage.setItem('watchlist-order', JSON.stringify(list))
+                setSortKey(null)
+              }
               return (
-                <div key={item.id}>
+                <div
+                  key={item.id}
+                  className={`transition-all duration-300 ${
+                    flashing[q.ticker] === 'up' ? 'ring-1 ring-green/50' :
+                    flashing[q.ticker] === 'down' ? 'ring-1 ring-red/50' : ''
+                  }`}
+                >
                   <div className="relative">
                     <StockCard
                       item={{ ...q, periodChanges: item.periodChanges }}
@@ -304,13 +360,26 @@ export default function Watchlist() {
                       hasAction
                       onClick={() => setExpandedTicker(isExpanded ? null : item.ticker)}
                     />
-                    <button
-                      onClick={(e) => { e.stopPropagation(); handleDelete(item.id) }}
-                      className="absolute top-1/2 -translate-y-1/2 right-3 text-text-muted hover:text-red transition-colors p-2"
-                    >
-                      <TrashIcon />
-                    </button>
+                    <div className="absolute top-1/2 -translate-y-1/2 right-3 flex flex-col gap-0.5">
+                      <button onClick={(e) => { e.stopPropagation(); moveUp() }}
+                        className="text-text-muted/40 hover:text-text p-0.5" title="Move up">
+                        <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><path d="M5 2L8.5 6.5H1.5z" /></svg>
+                      </button>
+                      <button onClick={(e) => { e.stopPropagation(); moveDown() }}
+                        className="text-text-muted/40 hover:text-text p-0.5" title="Move down">
+                        <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><path d="M5 8L1.5 3.5H8.5z" /></svg>
+                      </button>
+                      <button onClick={(e) => { e.stopPropagation(); handleDelete(item.id) }}
+                        className="text-text-muted hover:text-red transition-colors p-0.5" title="Remove">
+                        <TrashIcon />
+                      </button>
+                    </div>
                   </div>
+                  {q.analyst_rating && (
+                    <div className="px-3.5 pb-1 -mt-1">
+                      <AnalystBadge rating={q.analyst_rating} ticker={q.ticker} />
+                    </div>
+                  )}
                   {isExpanded && (
                     <div className="mt-1 rounded-xl border border-border overflow-hidden">
                       <TickerChart ticker={item.ticker} currency={q.currency} />
@@ -377,10 +446,13 @@ export default function Watchlist() {
                         onDrop={(e) => handleDrop(e, idx)}
                         onDragEnd={handleDragEnd}
                         onClick={() => setExpandedTicker(isExpanded ? null : item.ticker)}
-                        className={`border-b border-border/30 cursor-pointer transition-colors ${
+                        className={`border-b border-border/30 cursor-pointer transition-all duration-300 ${
                           isExpanded ? 'bg-surface-3/40' : 'hover:bg-surface-3/40'
                         } ${dragIdx === idx ? 'opacity-40' : ''} ${
                           overIdx === idx && dragIdx !== idx ? 'border-t-2 border-accent' : ''
+                        } ${
+                          flashing[q.ticker] === 'up' ? 'bg-green/10' :
+                          flashing[q.ticker] === 'down' ? 'bg-red/10' : ''
                         }`}
                       >
                         <td className="p-3 pl-2">
@@ -409,6 +481,9 @@ export default function Watchlist() {
                         <td className="text-right p-3 tabular-nums text-text-muted">
                           {q.dividend_yield > 0 ? `${q.dividend_yield.toFixed(2)}%` : '—'}
                         </td>
+                        <td className="text-center p-3">
+                          <AnalystBadge rating={q.analyst_rating} ticker={q.ticker} />
+                        </td>
                         <td className="text-right p-3 pr-4">
                           <button
                             onClick={(e) => { e.stopPropagation(); handleDelete(item.id) }}
@@ -420,7 +495,7 @@ export default function Watchlist() {
                       </tr>
                       {isExpanded && (
                         <tr key={`${item.id}-chart`}>
-                          <td colSpan={9} className="p-0">
+                          <td colSpan={10} className="p-0">
                             <TickerChart ticker={item.ticker} currency={q.currency} />
                           </td>
                         </tr>
@@ -480,6 +555,35 @@ function ExtendedHours({ quote: q, sym }) {
         </span>
       )}
     </div>
+  )
+}
+
+function AnalystBadge({ rating, ticker }) {
+  if (!rating) return <span className="text-text-muted text-xs">—</span>
+  const parts = rating.split(' - ')
+  const label = parts[1] || parts[0]
+  const lower = label.toLowerCase()
+  const color = lower.includes('buy') ? 'green' : lower.includes('sell') ? 'red' : 'accent'
+  const baseTicker = ticker?.split('.')[0] || ticker
+  const url = `https://finance.yahoo.com/quote/${encodeURIComponent(ticker)}/analysis/`
+
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      onClick={(e) => e.stopPropagation()}
+      className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium transition-opacity hover:opacity-80 ${
+        color === 'green' ? 'bg-green/15 text-green' :
+        color === 'red' ? 'bg-red/15 text-red' : 'bg-accent/15 text-accent'
+      }`}
+      title={`Analyst consensus: ${rating}`}
+    >
+      {label}
+      <svg width="8" height="8" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="opacity-50">
+        <path d="M7.5 5.5v2.5h-5.5v-5.5h2.5M6 1.5h2.5v2.5M4 6l4.5-4.5" />
+      </svg>
+    </a>
   )
 }
 
