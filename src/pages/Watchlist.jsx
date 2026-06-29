@@ -41,8 +41,8 @@ export default function Watchlist() {
   const [customOrder, setCustomOrder] = useState(() => {
     try { return JSON.parse(localStorage.getItem('watchlist-order')) || null } catch { return null }
   })
-  const [flashEnabled, setFlashEnabled] = useState(() => localStorage.getItem('watchlist-flash') !== 'false')
-  const [prevPrices, setPrevPrices] = useState({})
+  const [streamingEnabled, setStreamingEnabled] = useState(() => localStorage.getItem('watchlist-streaming') !== 'false')
+  const prevPricesRef = useRef({})
   const [flashing, setFlashing] = useState({})
   const [dragIdx, setDragIdx] = useState(null)
   const [overIdx, setOverIdx] = useState(null)
@@ -59,23 +59,25 @@ export default function Watchlist() {
   }, [interval])
 
   useEffect(() => {
-    if (!flashEnabled || !data?.items) return
+    if (!streamingEnabled || !data?.items) return
+    const prev = prevPricesRef.current
     const newFlash = {}
     const newPrices = {}
     for (const item of data.items) {
       const q = item.quote
       if (!q) continue
       newPrices[q.ticker] = q.price
-      if (prevPrices[q.ticker] != null && q.price !== prevPrices[q.ticker]) {
-        newFlash[q.ticker] = q.price > prevPrices[q.ticker] ? 'up' : 'down'
+      if (prev[q.ticker] != null && q.price !== prev[q.ticker]) {
+        newFlash[q.ticker] = q.price > prev[q.ticker] ? 'up' : 'down'
       }
     }
-    setPrevPrices(newPrices)
+    prevPricesRef.current = newPrices
     if (Object.keys(newFlash).length) {
       setFlashing(newFlash)
-      setTimeout(() => setFlashing({}), 1500)
+      const timer = setTimeout(() => setFlashing({}), 1500)
+      return () => clearTimeout(timer)
     }
-  }, [data, flashEnabled])
+  }, [data, streamingEnabled])
 
   const doRefresh = useCallback(async () => {
     setRefreshing(true)
@@ -247,14 +249,14 @@ export default function Watchlist() {
           )}
           <button
             onClick={() => {
-              const next = !flashEnabled
-              setFlashEnabled(next)
-              localStorage.setItem('watchlist-flash', String(next))
+              const next = !streamingEnabled
+              setStreamingEnabled(next)
+              localStorage.setItem('watchlist-streaming', String(next))
             }}
-            className={`text-[10px] transition-colors ${flashEnabled ? 'text-accent' : 'text-text-muted hover:text-accent'}`}
-            title={flashEnabled ? 'Disable flash' : 'Enable flash'}
+            className={`text-[10px] transition-colors ${streamingEnabled ? 'text-accent' : 'text-text-muted hover:text-accent'}`}
+            title={streamingEnabled ? 'Disable streaming quotes' : 'Enable streaming quotes'}
           >
-            Flash {flashEnabled ? 'ON' : 'OFF'}
+            Streaming {streamingEnabled ? 'ON' : 'OFF'}
           </button>
           {customOrder && (
             <button

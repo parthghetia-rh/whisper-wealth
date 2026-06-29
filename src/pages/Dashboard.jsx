@@ -1,11 +1,10 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { useApi } from '../hooks/useApi'
 import { useSSE } from '../hooks/useSSE'
 import HoldingsTable from '../components/HoldingsTable'
 import CurrencySelector, { useDisplayCurrency } from '../components/CurrencySelector'
 import RefreshSelector from '../components/RefreshSelector'
-import PortfolioHistory from '../components/PortfolioHistory'
 import { convertAmount, formatCurrency } from '../utils/currency'
 import AllocationBreakdown from '../components/AllocationBreakdown'
 import PerformanceTracker from '../components/PerformanceTracker'
@@ -13,7 +12,6 @@ import PerformanceTracker from '../components/PerformanceTracker'
 const HIDDEN = '••••••'
 
 export default function Dashboard() {
-  const [historyMode, setHistoryMode] = useState(null)
   const [showValues, setShowValues] = useState(() => {
     return localStorage.getItem('portfolio-show-values') !== 'false'
   })
@@ -53,9 +51,6 @@ export default function Dashboard() {
     { total_value: 0, total_cost: 0, annual_dividends: 0, positions: 0 }
   )
 
-  const total_gain = combined.total_value - combined.total_cost
-  const total_gain_percent =
-    combined.total_cost > 0 ? (total_gain / combined.total_cost) * 100 : 0
   const portfolio_yield =
     combined.total_value > 0
       ? (combined.annual_dividends / combined.total_value) * 100
@@ -92,67 +87,35 @@ export default function Dashboard() {
         <WelcomeBanner />
       )}
 
-      <PerformanceTracker displayCurrency={displayCurrency} showValues={showValues} />
+      <PerformanceTracker
+        displayCurrency={displayCurrency}
+        showValues={showValues}
+        combined={{ ...combined, yield: portfolio_yield }}
+      />
 
       {currencies.length > 0 && (
-        <>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <Link to="/dividends" className="block group">
+          <h3 className="text-sm font-medium text-text-muted mb-3 group-hover:text-accent transition-colors">
+            Projected Dividend Income
+          </h3>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <SummaryCard
-              label="Portfolio Value"
-              value={v(formatCurrency(combined.total_value, displayCurrency))}
-              sub={`${combined.positions} position${combined.positions !== 1 ? 's' : ''}`}
-              onClick={() => setHistoryMode(historyMode === 'value' ? null : 'value')}
+              label="Weekly"
+              value={v(formatCurrency(combined.annual_dividends / 52, displayCurrency))}
+              color="green"
             />
             <SummaryCard
-              label="Total Gain/Loss"
-              value={v(`${total_gain >= 0 ? '+' : ''}${formatCurrency(total_gain, displayCurrency)}`)}
-              sub={v(`${total_gain_percent >= 0 ? '+' : ''}${total_gain_percent.toFixed(2)}%`)}
-              color={total_gain >= 0 ? 'green' : 'red'}
-              onClick={() => setHistoryMode(historyMode === 'gain' ? null : 'gain')}
+              label="Monthly"
+              value={v(formatCurrency(combined.annual_dividends / 12, displayCurrency))}
+              color="green"
             />
             <SummaryCard
-              label="Cost Basis"
-              value={v(formatCurrency(combined.total_cost, displayCurrency))}
-            />
-            <SummaryCard
-              label="Yield"
-              value={v(`${portfolio_yield.toFixed(2)}%`)}
-              color={portfolio_yield > 0 ? 'green' : undefined}
+              label="Yearly"
+              value={v(formatCurrency(combined.annual_dividends, displayCurrency))}
+              color="green"
             />
           </div>
-
-          {historyMode && (
-            <PortfolioHistory
-              displayCurrency={displayCurrency}
-              mode={historyMode}
-              onClose={() => setHistoryMode(null)}
-            />
-          )}
-
-          <Link to="/dividends" className="block group">
-            <h3 className="text-sm font-medium text-text-muted mb-3 group-hover:text-accent transition-colors">
-              Projected Dividend Income
-            </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <SummaryCard
-                label="Weekly"
-                value={v(formatCurrency(combined.annual_dividends / 52, displayCurrency))}
-                color="green"
-              />
-              <SummaryCard
-                label="Monthly"
-                value={v(formatCurrency(combined.annual_dividends / 12, displayCurrency))}
-                color="green"
-              />
-              <SummaryCard
-                label="Yearly"
-                value={v(formatCurrency(combined.annual_dividends, displayCurrency))}
-                color="green"
-              />
-            </div>
-          </Link>
-
-        </>
+        </Link>
       )}
 
       {holdings?.length > 0 && (
@@ -172,88 +135,6 @@ export default function Dashboard() {
       <div>
         <h3 className="text-sm font-medium text-text-muted mb-3">Holdings</h3>
         <HoldingsTable holdings={holdings} showValues={showValues} />
-      </div>
-    </div>
-  )
-}
-
-function WelcomeBanner() {
-  return (
-    <div className="bg-surface-2 rounded-xl border border-border p-6 space-y-5">
-      <div className="flex items-center gap-3">
-        <svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <rect x="1" y="1" width="34" height="34" rx="10" className="fill-accent/15 stroke-accent" strokeWidth="1.5" />
-          <path d="M5 18 Q7 12, 9 18 Q11 24, 13 18" className="stroke-accent/50" strokeWidth="1.8" strokeLinecap="round" fill="none" />
-          <path d="M13 18 Q14.5 14, 16 18" className="stroke-accent/70" strokeWidth="1.8" strokeLinecap="round" fill="none" />
-          <rect x="18" y="20" width="3.5" height="9" rx="1.2" className="fill-accent/50" />
-          <rect x="23" y="15" width="3.5" height="14" rx="1.2" className="fill-accent/75" />
-          <rect x="28" y="9" width="3.5" height="20" rx="1.2" className="fill-accent" />
-        </svg>
-        <div>
-          <h3 className="text-lg font-semibold">Welcome to WhisperWealth</h3>
-          <p className="text-sm text-text-muted">Your private financial dashboard</p>
-        </div>
-      </div>
-
-      <p className="text-sm text-text-muted">
-        Get started by adding your first transactions. Here's how:
-      </p>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div className="bg-surface-3 rounded-lg p-4 space-y-2">
-          <div className="flex items-center gap-2">
-            <span className="bg-accent/20 text-accent text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center">1</span>
-            <span className="text-sm font-medium">Add transactions manually</span>
-          </div>
-          <p className="text-xs text-text-muted leading-relaxed">
-            Go to the <Link to="/transactions" className="text-accent hover:text-accent-hover">Transactions</Link> tab and
-            use the form to add buy/sell entries one at a time. Enter the ticker, shares, price, and date.
-          </p>
-        </div>
-
-        <div className="bg-surface-3 rounded-lg p-4 space-y-2">
-          <div className="flex items-center gap-2">
-            <span className="bg-accent/20 text-accent text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center">2</span>
-            <span className="text-sm font-medium">Import from CSV</span>
-          </div>
-          <p className="text-xs text-text-muted leading-relaxed">
-            Export your transaction history from your broker (Wealthsimple, Questrade, etc.) as a CSV file, then
-            click <Link to="/transactions" className="text-accent hover:text-accent-hover">Import CSV</Link> on
-            the Transactions page to bulk-import.
-          </p>
-        </div>
-
-        <div className="bg-surface-3 rounded-lg p-4 space-y-2">
-          <div className="flex items-center gap-2">
-            <span className="bg-accent/20 text-accent text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center">3</span>
-            <span className="text-sm font-medium">Track sitting cash</span>
-          </div>
-          <p className="text-xs text-text-muted leading-relaxed">
-            Head to <Link to="/cash" className="text-accent hover:text-accent-hover">Sitting Cash</Link> to add
-            your HISA or savings balances with interest rates. The projected interest feeds into your dividend income.
-          </p>
-        </div>
-
-        <div className="bg-surface-3 rounded-lg p-4 space-y-2">
-          <div className="flex items-center gap-2">
-            <span className="bg-accent/20 text-accent text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center">4</span>
-            <span className="text-sm font-medium">Build your watchlist</span>
-          </div>
-          <p className="text-xs text-text-muted leading-relaxed">
-            Visit the <Link to="/watchlist" className="text-accent hover:text-accent-hover">Watchlist</Link> tab
-            to track any ticker with live prices. Your portfolio stocks are added automatically.
-          </p>
-        </div>
-      </div>
-
-      <div className="flex items-center gap-2 pt-1">
-        <Link
-          to="/transactions"
-          className="px-4 py-2 bg-accent hover:bg-accent-hover text-white rounded-lg text-sm font-medium transition-colors"
-        >
-          Add your first transaction
-        </Link>
-        <span className="text-xs text-text-muted">or import a CSV</span>
       </div>
     </div>
   )
@@ -292,6 +173,44 @@ function SummaryCard({ label, value, sub, color, onClick }) {
           {sub}
         </div>
       )}
+    </div>
+  )
+}
+
+function WelcomeBanner() {
+  return (
+    <div className="bg-surface-2 rounded-xl border border-border p-6 space-y-5">
+      <div className="flex items-center gap-3">
+        <div>
+          <h3 className="text-lg font-semibold">Welcome to WhisperWealth</h3>
+          <p className="text-sm text-text-muted">Your private financial dashboard</p>
+        </div>
+      </div>
+      <p className="text-sm text-text-muted">
+        Get started by adding your first transactions.
+      </p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="bg-surface-3 rounded-lg p-4 space-y-2">
+          <span className="text-sm font-medium">Add transactions manually</span>
+          <p className="text-xs text-text-muted leading-relaxed">
+            Go to <Link to="/transactions" className="text-accent hover:text-accent-hover">Transactions</Link> and
+            enter buy/sell entries.
+          </p>
+        </div>
+        <div className="bg-surface-3 rounded-lg p-4 space-y-2">
+          <span className="text-sm font-medium">Import from CSV or PDF</span>
+          <p className="text-xs text-text-muted leading-relaxed">
+            Click <Link to="/transactions" className="text-accent hover:text-accent-hover">Import File</Link> on
+            the Transactions page.
+          </p>
+        </div>
+      </div>
+      <Link
+        to="/transactions"
+        className="inline-block px-4 py-2 bg-accent hover:bg-accent-hover text-white rounded-lg text-sm font-medium transition-colors"
+      >
+        Add your first transaction
+      </Link>
     </div>
   )
 }
