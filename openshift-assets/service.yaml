@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: whisperwealth
+  namespace: whisperwealth
+  labels:
+    app: whisperwealth
+spec:
+  selector:
+    app: whisperwealth
+  ports:
+    - port: 3000
+      targetPort: 3000
+      protocol: TCP
+  type: ClusterIP

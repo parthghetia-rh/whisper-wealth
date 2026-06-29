@@ -1,0 +1,17 @@
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: whisperwealth
+  namespace: whisperwealth
+  labels:
+    app: whisperwealth
+spec:
+  to:
+    kind: Service
+    name: whisperwealth
+    weight: 100
+  port:
+    targetPort: 3000
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect

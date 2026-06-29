@@ -40,6 +40,8 @@ const importLimiter = rateLimit({ windowMs: 60_000, max: 5 })
 app.use('/api/transactions/import', express.json({ limit: '10mb' }), importLimiter)
 app.use(express.json({ limit: '100kb' }))
 
+app.get('/health', (req, res) => res.json({ status: 'ok' }))
+
 app.use('/api', apiLimiter)
 app.use('/api', authMiddleware)
 app.use('/api/transactions', transactionsRouter)
