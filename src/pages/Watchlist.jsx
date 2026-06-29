@@ -4,6 +4,7 @@ import { useApi, postApi, deleteApi } from '../hooks/useApi'
 import { currencySymbol } from '../utils/currency'
 import TickerChart from '../components/TickerChart'
 import StockCard from '../components/StockCard'
+import TickerDetail from '../components/TickerDetail'
 
 const INTERVALS = [
   { label: '10s', value: 10_000 },
@@ -30,6 +31,7 @@ const WL_COLUMNS = [
 export default function Watchlist() {
   const { data, refetch } = useApi('/api/watchlist')
   const [ticker, setTicker] = useState('')
+  const [listName, setListName] = useState('')
   const [error, setError] = useState(null)
   const [adding, setAdding] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
@@ -106,7 +108,7 @@ export default function Watchlist() {
     setError(null)
     setAdding(true)
     try {
-      await postApi('/api/watchlist', { ticker: ticker.trim() })
+      await postApi('/api/watchlist', { ticker: ticker.trim(), list_name: listName.trim() || undefined })
       setTicker('')
       await new Promise((r) => setTimeout(r, 2000))
       refetch()
@@ -169,11 +171,15 @@ export default function Watchlist() {
     setSortKey(null)
   }
 
+  const [activeList, setActiveList] = useState('All')
+
   const items = data?.items || []
+  const allLists = ['All', ...new Set(items.map((i) => i.list_name || 'Default'))]
+  const filteredItems = activeList === 'All' ? items : items.filter((i) => (i.list_name || 'Default') === activeList)
 
   const orderedItems = (() => {
     if (sortKey) {
-      return [...items].sort((a, b) => {
+      return [...filteredItems].sort((a, b) => {
         const col = WL_COLUMNS.find((c) => c.key === sortKey)
         if (!col) return 0
         let av, bv
@@ -192,12 +198,12 @@ export default function Watchlist() {
     }
     if (customOrder) {
       const byTicker = {}
-      items.forEach((i) => { byTicker[i.ticker] = i })
+      filteredItems.forEach((i) => { byTicker[i.ticker] = i })
       const ordered = customOrder.map((t) => byTicker[t]).filter(Boolean)
-      const remaining = items.filter((i) => !customOrder.includes(i.ticker))
+      const remaining = filteredItems.filter((i) => !customOrder.includes(i.ticker))
       return [...ordered, ...remaining]
     }
-    return items
+    return filteredItems
   })()
 
   const sortedItems = orderedItems
@@ -269,13 +275,38 @@ export default function Watchlist() {
         </div>
       </div>
 
+      {allLists.length > 1 && (
+        <div className="flex gap-1.5 overflow-x-auto pb-1">
+          {allLists.map((list) => (
+            <button
+              key={list}
+              onClick={() => setActiveList(list)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${
+                activeList === list
+                  ? 'bg-accent text-white'
+                  : 'bg-surface-2 text-text-muted hover:text-text border border-border'
+              }`}
+            >
+              {list}
+            </button>
+          ))}
+        </div>
+      )}
+
       <form onSubmit={handleAdd} className="flex flex-col sm:flex-row gap-3">
         <input
           type="text"
           value={ticker}
           onChange={(e) => setTicker(e.target.value.toUpperCase())}
-          placeholder="Add ticker e.g. AAPL, MSFT.TO, RELIANCE.NS"
+          placeholder="Add ticker e.g. AAPL, MSFT.TO"
           className="flex-1 bg-surface-2 border border-border rounded-lg px-4 py-2.5 text-sm text-text placeholder:text-text-muted/50 outline-none focus:border-accent transition-colors"
+        />
+        <input
+          type="text"
+          value={listName}
+          onChange={(e) => setListName(e.target.value)}
+          placeholder="List name (default)"
+          className="sm:w-36 bg-surface-2 border border-border rounded-lg px-3 py-2.5 text-sm text-text placeholder:text-text-muted/50 outline-none focus:border-accent transition-colors"
         />
         <button
           type="submit"
@@ -385,6 +416,7 @@ export default function Watchlist() {
                   {isExpanded && (
                     <div className="mt-1 rounded-xl border border-border overflow-hidden">
                       <TickerChart ticker={item.ticker} currency={q.currency} />
+                      <TickerDetail quote={q} item={item} onUpdate={refetch} />
                     </div>
                   )}
                 </div>
@@ -500,6 +532,7 @@ export default function Watchlist() {
                         <tr key={`${item.id}-chart`}>
                           <td colSpan={10} className="p-0">
                             <TickerChart ticker={item.ticker} currency={q.currency} />
+                            <TickerDetail quote={q} item={item} onUpdate={refetch} />
                           </td>
                         </tr>
                       )}

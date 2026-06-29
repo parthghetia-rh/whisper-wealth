@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { themes, getStoredTheme, applyTheme } from '../utils/themes'
+import NotificationBell from './NotificationBell'
 
 const DEFAULT_NAV = [
   { to: '/', label: 'Dashboard', icon: 'dashboard', short: 'Home' },
@@ -276,8 +277,10 @@ export default function Layout({ onLogout }) {
 
         <div className={`border-t border-border ${collapsed ? 'p-2' : 'p-3'}`}>
           <div className={`flex items-center ${collapsed ? 'flex-col gap-2' : 'justify-between'}`}>
-            <button
-              onClick={toggleCollapse}
+            <div className="flex items-center gap-1">
+              <NotificationBell />
+              <button
+                onClick={toggleCollapse}
               className="p-1.5 rounded-lg text-text-muted hover:text-text hover:bg-surface-3 transition-colors"
               title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
             >
@@ -289,6 +292,7 @@ export default function Layout({ onLogout }) {
                 )}
               </svg>
             </button>
+            </div>
             {!collapsed && (
               <>
                 <p className="text-[11px] text-text-muted">Localhost only</p>
@@ -325,8 +329,10 @@ export default function Layout({ onLogout }) {
             <Logo size={24} />
             <span className="text-sm font-semibold text-text">WhisperWealth</span>
           </NavLink>
-          <button
-            onClick={() => setSettingsOpen(!settingsOpen)}
+          <div className="flex items-center gap-1">
+            <NotificationBell />
+            <button
+              onClick={() => setSettingsOpen(!settingsOpen)}
             className="p-1.5 text-text-muted hover:text-text"
           >
             <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -334,6 +340,7 @@ export default function Layout({ onLogout }) {
               <path d="M9 1.5v2M9 14.5v2M1.5 9h2M14.5 9h2M3.4 3.4l1.4 1.4M13.2 13.2l1.4 1.4M3.4 14.6l1.4-1.4M13.2 4.8l1.4-1.4" />
             </svg>
           </button>
+          </div>
         </div>
 
         {/* Mobile settings dropdown */}

@@ -27,6 +27,26 @@ async function fetchWatchlistQuotes() {
   cachedQuotes = map
   lastFetch = Date.now()
 
+  const alerts = stmtAll('SELECT * FROM price_alerts WHERE triggered = 0')
+  for (const alert of alerts) {
+    const q = map[alert.ticker]
+    if (!q) continue
+    const triggered =
+      (alert.condition === 'above' && q.price >= alert.target_price) ||
+      (alert.condition === 'below' && q.price <= alert.target_price)
+    if (triggered) {
+      stmtRun("UPDATE price_alerts SET triggered = 1, triggered_at = datetime('now') WHERE id = ?", [alert.id])
+      stmtRun(
+        'INSERT INTO notifications (type, title, message) VALUES (?, ?, ?)',
+        [
+          'price_alert',
+          `${alert.ticker} hit ${alert.condition === 'above' ? 'above' : 'below'} $${alert.target_price}`,
+          `${alert.ticker} is now at $${q.price.toFixed(2)} (target: ${alert.condition} $${alert.target_price})`,
+        ]
+      )
+    }
+  }
+
   const needPeriodRefresh = Date.now() - lastPeriodFetch > PERIOD_CACHE_MS
   if (needPeriodRefresh) {
     for (let i = 0; i < tickers.length; i++) {
@@ -81,8 +101,13 @@ router.post('/refresh', async (req, res) => {
   }
 })
 
+router.get('/lists', (req, res) => {
+  const rows = stmtAll('SELECT DISTINCT list_name FROM watchlist ORDER BY list_name')
+  res.json(rows.map((r) => r.list_name || 'Default'))
+})
+
 router.post('/', (req, res) => {
-  const { ticker } = req.body
+  const { ticker, list_name } = req.body
   if (!ticker || typeof ticker !== 'string') {
     return res.status(400).json({ error: 'Ticker is required' })
   }
@@ -101,24 +126,75 @@ router.post('/', (req, res) => {
     return res.status(409).json({ error: 'Ticker already in watchlist' })
   }
 
-  stmtRun('INSERT INTO watchlist (ticker) VALUES (?)', [sanitized])
+  const listName = (list_name || 'Default').trim().substring(0, 50)
+  stmtRun('INSERT INTO watchlist (ticker, list_name) VALUES (?, ?)', [sanitized, listName])
   const row = stmtGet('SELECT * FROM watchlist WHERE ticker = ?', [sanitized])
 
   fetchWatchlistQuotes().catch(() => {})
-
   res.status(201).json(row)
+})
+
+router.put('/:id', (req, res) => {
+  const id = Number(req.params.id)
+  if (!Number.isInteger(id)) return res.status(400).json({ error: 'Invalid ID' })
+
+  const existing = stmtGet('SELECT * FROM watchlist WHERE id = ?', [id])
+  if (!existing) return res.status(404).json({ error: 'Not found' })
+
+  const { note, list_name } = req.body
+  if (note !== undefined) {
+    stmtRun('UPDATE watchlist SET note = ? WHERE id = ?', [note?.substring(0, 500) || null, id])
+  }
+  if (list_name !== undefined) {
+    stmtRun('UPDATE watchlist SET list_name = ? WHERE id = ?', [(list_name || 'Default').trim().substring(0, 50), id])
+  }
+  const row = stmtGet('SELECT * FROM watchlist WHERE id = ?', [id])
+  res.json(row)
 })
 
 router.delete('/:id', (req, res) => {
   const id = Number(req.params.id)
-  if (!Number.isInteger(id)) {
-    return res.status(400).json({ error: 'Invalid ID' })
-  }
+  if (!Number.isInteger(id)) return res.status(400).json({ error: 'Invalid ID' })
 
   const result = stmtRun('DELETE FROM watchlist WHERE id = ?', [id])
-  if (result.changes === 0) {
-    return res.status(404).json({ error: 'Ticker not found in watchlist' })
-  }
+  if (result.changes === 0) return res.status(404).json({ error: 'Not found' })
+  res.json({ success: true })
+})
+
+router.get('/alerts', (req, res) => {
+  const rows = stmtAll('SELECT * FROM price_alerts ORDER BY created_at DESC')
+  res.json(rows)
+})
+
+router.post('/alerts', (req, res) => {
+  const { ticker, condition, target_price } = req.body
+  if (!ticker || typeof ticker !== 'string') return res.status(400).json({ error: 'Ticker required' })
+  if (condition !== 'above' && condition !== 'below') return res.status(400).json({ error: 'Condition must be above or below' })
+  if (!Number.isFinite(target_price) || target_price <= 0) return res.status(400).json({ error: 'Invalid target price' })
+
+  const result = stmtRun(
+    'INSERT INTO price_alerts (ticker, condition, target_price) VALUES (?, ?, ?)',
+    [ticker.trim().toUpperCase(), condition, target_price]
+  )
+  const row = stmtGet('SELECT * FROM price_alerts WHERE id = ?', [result.lastInsertRowid])
+  res.status(201).json(row)
+})
+
+router.delete('/alerts/:id', (req, res) => {
+  const id = Number(req.params.id)
+  if (!Number.isInteger(id)) return res.status(400).json({ error: 'Invalid ID' })
+  stmtRun('DELETE FROM price_alerts WHERE id = ?', [id])
+  res.json({ success: true })
+})
+
+router.get('/notifications', (req, res) => {
+  const rows = stmtAll('SELECT * FROM notifications ORDER BY created_at DESC LIMIT 50')
+  const unread = stmtAll('SELECT COUNT(*) as c FROM notifications WHERE read = 0')[0]?.c || 0
+  res.json({ notifications: rows, unread })
+})
+
+router.post('/notifications/read', (req, res) => {
+  stmtRun('UPDATE notifications SET read = 1 WHERE read = 0')
   res.json({ success: true })
 })
 

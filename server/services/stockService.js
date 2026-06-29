@@ -37,6 +37,10 @@ export async function getQuotes(tickers) {
         post_market_change_percent: quote.postMarketChangePercent ?? null,
         day_high: quote.regularMarketDayHigh ?? null,
         day_low: quote.regularMarketDayLow ?? null,
+        fifty_two_week_high: quote.fiftyTwoWeekHigh ?? null,
+        fifty_two_week_low: quote.fiftyTwoWeekLow ?? null,
+        volume: quote.regularMarketVolume ?? null,
+        avg_volume: quote.averageDailyVolume10Day ?? null,
         analyst_rating: quote.averageAnalystRating ?? null,
       })
     } catch (err) {

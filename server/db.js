@@ -126,6 +126,34 @@ db.run(`
   CREATE TABLE IF NOT EXISTS watchlist (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     ticker TEXT NOT NULL UNIQUE,
+    list_name TEXT DEFAULT 'Default',
+    note TEXT,
+    created_at TEXT DEFAULT (datetime('now'))
+  )
+`)
+
+try { db.run("ALTER TABLE watchlist ADD COLUMN list_name TEXT DEFAULT 'Default'") } catch {}
+try { db.run("ALTER TABLE watchlist ADD COLUMN note TEXT") } catch {}
+
+db.run(`
+  CREATE TABLE IF NOT EXISTS price_alerts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ticker TEXT NOT NULL,
+    condition TEXT NOT NULL,
+    target_price REAL NOT NULL,
+    triggered INTEGER DEFAULT 0,
+    triggered_at TEXT,
+    created_at TEXT DEFAULT (datetime('now'))
+  )
+`)
+
+db.run(`
+  CREATE TABLE IF NOT EXISTS notifications (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    type TEXT NOT NULL,
+    title TEXT NOT NULL,
+    message TEXT,
+    read INTEGER DEFAULT 0,
     created_at TEXT DEFAULT (datetime('now'))
   )
 `)
