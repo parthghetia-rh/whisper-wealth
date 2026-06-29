@@ -560,23 +560,27 @@ function ExtendedHours({ quote: q, sym }) {
   )
 }
 
+function parseRating(rating) {
+  const parts = rating.split(' - ')
+  const score = parseFloat(parts[0])
+  if (score <= 1.5) return { label: 'Strong Buy', color: 'bg-green/20 text-green' }
+  if (score <= 2.5) return { label: 'Moderate Buy', color: 'bg-amber-500/15 text-amber-400' }
+  if (score <= 3.5) return { label: 'Hold', color: 'bg-accent/15 text-accent' }
+  if (score <= 4.5) return { label: 'Moderate Sell', color: 'bg-orange-500/15 text-orange-400' }
+  return { label: 'Strong Sell', color: 'bg-red/20 text-red' }
+}
+
 function AnalystBadge({ rating, ticker }) {
   if (!rating) return <span className="text-text-muted text-xs">—</span>
-  const parts = rating.split(' - ')
-  const label = parts[1] || parts[0]
-  const lower = label.toLowerCase()
-  const color = lower.includes('buy') ? 'green' : lower.includes('sell') ? 'red' : 'accent'
+  const { label, color } = parseRating(rating)
   const baseTicker = ticker?.split('.')[0] || ticker
   const tipranksUrl = `https://www.tipranks.com/stocks/${encodeURIComponent(baseTicker.toLowerCase())}/forecast`
 
   return (
     <div className="inline-flex flex-col items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
       <span
-        className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${
-          color === 'green' ? 'bg-green/15 text-green' :
-          color === 'red' ? 'bg-red/15 text-red' : 'bg-accent/15 text-accent'
-        }`}
-        title={`Yahoo Finance consensus: ${rating}`}
+        className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${color}`}
+        title={`Analyst consensus: ${rating} — ${label}`}
       >
         {label}
       </span>
