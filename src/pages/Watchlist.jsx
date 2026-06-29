@@ -567,7 +567,7 @@ function AnalystBadge({ rating, ticker }) {
   const lower = label.toLowerCase()
   const color = lower.includes('buy') ? 'green' : lower.includes('sell') ? 'red' : 'accent'
   const baseTicker = ticker?.split('.')[0] || ticker
-  const url = `https://finance.yahoo.com/quote/${encodeURIComponent(ticker)}/analysis/`
+  const url = `https://www.tipranks.com/stocks/${encodeURIComponent(baseTicker.toLowerCase())}/forecast`
 
   return (
     <a

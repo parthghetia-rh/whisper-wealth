@@ -41,6 +41,17 @@ export async function getQuotes(tickers) {
       console.error(`Failed to fetch quote for ${ticker}:`, err.message)
     }
   }
+
+  for (const r of results) {
+    if (!r.analyst_rating && r.ticker.includes('.')) {
+      const baseTicker = r.ticker.split('.')[0]
+      try {
+        const baseQuote = await yahooFinance.quote(baseTicker)
+        r.analyst_rating = baseQuote.averageAnalystRating ?? null
+      } catch {}
+    }
+  }
+
   return results
 }
 
