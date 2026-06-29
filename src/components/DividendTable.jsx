@@ -54,7 +54,7 @@ export default function DividendTable({ holdings }) {
         {sortKey && (
           <button
             onClick={() => setSortDir(sortDir === 'asc' ? 'desc' : 'asc')}
-            className="flex items-center gap-1 text-xs text-text-muted hover:text-text"
+            className="flex items-center gap-1 text-xs text-text-muted hover:text-text px-2 py-1 bg-surface-3 border border-border rounded-lg"
           >
             {sortDir === 'asc' ? 'Low first' : 'High first'}
             <SortArrow dir={sortDir} />

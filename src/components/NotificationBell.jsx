@@ -5,6 +5,8 @@ export default function NotificationBell() {
   const { data, refetch } = useApi('/api/watchlist/notifications')
   const [open, setOpen] = useState(false)
   const ref = useRef(null)
+  const btnRef = useRef(null)
+  const [dropUp, setDropUp] = useState(false)
 
   const unread = data?.unread || 0
   const notifications = data?.notifications || []
@@ -22,6 +24,13 @@ export default function NotificationBell() {
     return () => document.removeEventListener('mousedown', handleClick)
   }, [])
 
+  useEffect(() => {
+    if (open && btnRef.current) {
+      const rect = btnRef.current.getBoundingClientRect()
+      setDropUp(rect.bottom > window.innerHeight - 300)
+    }
+  }, [open])
+
   const markRead = async () => {
     await postApi('/api/watchlist/notifications/read', {})
     refetch()
@@ -30,6 +39,7 @@ export default function NotificationBell() {
   return (
     <div className="relative" ref={ref}>
       <button
+        ref={btnRef}
         onClick={() => { setOpen(!open); if (!open && unread > 0) markRead() }}
         className="p-1.5 text-text-muted hover:text-text transition-colors relative"
       >
@@ -45,7 +55,18 @@ export default function NotificationBell() {
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full mt-2 w-72 bg-surface-2 border border-border rounded-xl shadow-lg z-50 overflow-hidden">
+        <div
+          className={`fixed md:absolute w-72 bg-surface-2 border border-border rounded-xl shadow-lg z-[100] overflow-hidden ${
+            dropUp
+              ? 'bottom-full mb-2 left-0'
+              : 'top-full mt-2 right-0'
+          }`}
+          style={
+            typeof window !== 'undefined' && window.innerWidth < 768
+              ? { position: 'fixed', top: '56px', right: '8px', left: 'auto', bottom: 'auto' }
+              : undefined
+          }
+        >
           <div className="p-3 border-b border-border flex items-center justify-between">
             <span className="text-xs font-medium">Notifications</span>
             {notifications.length > 0 && (

@@ -350,6 +350,17 @@ export default function Watchlist() {
                 <option value="price">Price</option>
                 <option value="ticker">Ticker</option>
               </select>
+              {sortKey && (
+                <button
+                  onClick={() => setSortDir(sortDir === 'asc' ? 'desc' : 'asc')}
+                  className="flex items-center gap-1 text-xs text-text-muted hover:text-text px-2 py-1 bg-surface-3 border border-border rounded-lg"
+                >
+                  {sortDir === 'asc' ? 'Low first' : 'High first'}
+                  <svg width="8" height="10" viewBox="0 0 8 10" fill="currentColor" className="text-accent">
+                    {sortDir === 'asc' ? <path d="M4 1L7.5 5.5H0.5z" /> : <path d="M4 9L0.5 4.5H7.5z" />}
+                  </svg>
+                </button>
+              )}
             </div>
             {sortedItems.map((item, idx) => {
               const q = item.quote

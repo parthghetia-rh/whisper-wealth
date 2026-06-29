@@ -48,22 +48,43 @@ export default function CSVImport({ onImported }) {
     setPreview(null)
     setPdfRawText(null)
 
-    const isPdf = file.name.toLowerCase().endsWith('.pdf') || file.type === 'application/pdf'
+    const nameLower = (file.name || '').toLowerCase()
+    const isPdf = nameLower.endsWith('.pdf') || file.type === 'application/pdf' || file.type === 'application/x-pdf'
 
     if (isPdf) {
       setFileType('pdf')
       setLoading(true)
       try {
-        const base64 = await new Promise((resolve, reject) => {
-          const reader = new FileReader()
-          reader.onload = () => {
-            const result = reader.result
-            const base64String = result.split(',')[1]
-            resolve(base64String)
+        let base64
+        try {
+          base64 = await new Promise((resolve, reject) => {
+            const reader = new FileReader()
+            reader.onload = () => {
+              const result = reader.result
+              if (!result) return reject(new Error('Empty file'))
+              const b64 = typeof result === 'string' ? result.split(',')[1] : null
+              if (!b64) return reject(new Error('Failed to encode'))
+              resolve(b64)
+            }
+            reader.onerror = () => reject(new Error('Failed to read file'))
+            reader.readAsDataURL(file)
+          })
+        } catch {
+          const buf = await file.arrayBuffer()
+          const bytes = new Uint8Array(buf)
+          const chunks = []
+          for (let i = 0; i < bytes.length; i += 8192) {
+            chunks.push(String.fromCharCode.apply(null, bytes.subarray(i, i + 8192)))
           }
-          reader.onerror = () => reject(new Error('Failed to read PDF file'))
-          reader.readAsDataURL(file)
-        })
+          base64 = btoa(chunks.join(''))
+        }
+
+        if (!base64) {
+          setError('Failed to read PDF file. Try a smaller file or use CSV instead.')
+          setStep('upload')
+          setLoading(false)
+          return
+        }
 
         const data = await postApi('/api/transactions/import/parse-pdf', { pdf: base64, exchange: pdfExchange })
         if (!data) {
@@ -270,15 +291,18 @@ export default function CSVImport({ onImported }) {
           <input
             ref={fileRef}
             type="file"
-            accept=".csv,.tsv,.txt,.pdf"
+            accept=".csv,.tsv,.txt,.pdf,text/csv,text/tab-separated-values,application/pdf"
             className="hidden"
             onChange={(e) => handleFile(e.target.files[0])}
           />
+          <svg className="mx-auto mb-2 text-text-muted/40" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 3v12M8 7l4-4 4 4M4 17v2h16v-2" />
+          </svg>
           <p className="text-sm text-text-muted">
-            Drop a CSV, TSV, or PDF file here, or click to browse
+            <span className="hidden sm:inline">Drop a file here or </span>Tap to select a CSV, TSV, or PDF
           </p>
           <p className="text-xs text-text-muted/60 mt-1">
-            CSV/TSV: broker exports with column mapping. PDF: printed broker confirmation emails.
+            CSV/TSV: broker exports. PDF: printed broker emails.
           </p>
         </div>
         </>
