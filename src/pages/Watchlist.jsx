@@ -474,6 +474,7 @@ export default function Watchlist() {
                         <td className="p-3 text-text-muted text-xs truncate max-w-[150px]">{q.name}</td>
                         <td className="text-right p-3">
                           <div className="tabular-nums font-medium">{sym}{q.price.toFixed(2)}</div>
+                          <DayRange quote={q} />
                           <ExtendedHours quote={q} sym={sym} />
                         </td>
                         <td className="text-right p-3"><PctBadge value={q.change_percent} /></td>
@@ -537,6 +538,24 @@ function SortArrow({ dir }) {
         <path d="M4 9L0.5 4.5H7.5z" />
       )}
     </svg>
+  )
+}
+
+function DayRange({ quote: q }) {
+  if (!q.day_low || !q.day_high || q.day_high <= q.day_low) return null
+  const range = q.day_high - q.day_low
+  const pos = range > 0 ? ((q.price - q.day_low) / range) * 100 : 50
+  return (
+    <div className="flex items-center gap-1.5 mt-0.5">
+      <span className="text-[9px] tabular-nums text-text-muted">{q.day_low.toFixed(2)}</span>
+      <div className="flex-1 bg-surface-3 rounded-full h-1 relative min-w-[40px]">
+        <div
+          className="absolute top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-text"
+          style={{ left: `${Math.min(Math.max(pos, 5), 95)}%` }}
+        />
+      </div>
+      <span className="text-[9px] tabular-nums text-text-muted">{q.day_high.toFixed(2)}</span>
+    </div>
   )
 }
 

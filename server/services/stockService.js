@@ -35,6 +35,8 @@ export async function getQuotes(tickers) {
         post_market_price: quote.postMarketPrice ?? null,
         post_market_change: quote.postMarketChange ?? null,
         post_market_change_percent: quote.postMarketChangePercent ?? null,
+        day_high: quote.regularMarketDayHigh ?? null,
+        day_low: quote.regularMarketDayLow ?? null,
         analyst_rating: quote.averageAnalystRating ?? null,
       })
     } catch (err) {
