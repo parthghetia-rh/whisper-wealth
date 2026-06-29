@@ -567,25 +567,31 @@ function AnalystBadge({ rating, ticker }) {
   const lower = label.toLowerCase()
   const color = lower.includes('buy') ? 'green' : lower.includes('sell') ? 'red' : 'accent'
   const baseTicker = ticker?.split('.')[0] || ticker
-  const url = `https://www.tipranks.com/stocks/${encodeURIComponent(baseTicker.toLowerCase())}/forecast`
+  const tipranksUrl = `https://www.tipranks.com/stocks/${encodeURIComponent(baseTicker.toLowerCase())}/forecast`
 
   return (
-    <a
-      href={url}
-      target="_blank"
-      rel="noopener noreferrer"
-      onClick={(e) => e.stopPropagation()}
-      className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium transition-opacity hover:opacity-80 ${
-        color === 'green' ? 'bg-green/15 text-green' :
-        color === 'red' ? 'bg-red/15 text-red' : 'bg-accent/15 text-accent'
-      }`}
-      title={`Analyst consensus: ${rating}`}
-    >
-      {label}
-      <svg width="8" height="8" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="opacity-50">
-        <path d="M7.5 5.5v2.5h-5.5v-5.5h2.5M6 1.5h2.5v2.5M4 6l4.5-4.5" />
-      </svg>
-    </a>
+    <div className="inline-flex flex-col items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
+      <span
+        className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${
+          color === 'green' ? 'bg-green/15 text-green' :
+          color === 'red' ? 'bg-red/15 text-red' : 'bg-accent/15 text-accent'
+        }`}
+        title={`Yahoo Finance consensus: ${rating}`}
+      >
+        {label}
+      </span>
+      <a
+        href={tipranksUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-[8px] text-text-muted hover:text-accent transition-colors inline-flex items-center gap-0.5"
+      >
+        TipRanks
+        <svg width="6" height="6" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M7.5 5.5v2.5h-5.5v-5.5h2.5M6 1.5h2.5v2.5M4 6l4.5-4.5" />
+        </svg>
+      </a>
+    </div>
   )
 }
 
