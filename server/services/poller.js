@@ -2,9 +2,21 @@ import db, { stmtAll, stmtRun, stmtRunBatch, stmtGet, save } from '../db.js'
 import { getQuotes, getDividendHistory, getExchangeRates } from './stockService.js'
 import { checkMilestones } from './milestones.js'
 
-const POLL_INTERVAL = 5 * 60 * 1000
+const MARKET_POLL_INTERVAL = 5 * 60 * 1000
+const AFTER_HOURS_POLL_INTERVAL = 30 * 60 * 1000
 const HEAVY_POLL_INTERVAL = 6 * 60 * 60 * 1000
 let lastHeavyPoll = 0
+
+function isMarketHours() {
+  const now = new Date()
+  const et = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }))
+  const hour = et.getHours()
+  const min = et.getMinutes()
+  const day = et.getDay()
+  if (day === 0 || day === 6) return false
+  const time = hour * 60 + min
+  return time >= 540 && time <= 960
+}
 const MAX_SSE_CLIENTS = 20
 const sseClients = new Set()
 let latestRates = { USD: 1 }
@@ -225,11 +237,19 @@ function syncPortfolioToWatchlist() {
   }
 }
 
+function scheduleNext() {
+  const interval = isMarketHours() ? MARKET_POLL_INTERVAL : AFTER_HOURS_POLL_INTERVAL
+  setTimeout(() => {
+    poll()
+      .catch((err) => console.error('Poll failed:', err.message))
+      .finally(scheduleNext)
+  }, interval)
+}
+
 export function startPoller() {
   cleanupDRIP()
   syncPortfolioToWatchlist()
+  console.log(`Market hours: ${isMarketHours() ? 'YES (5min polling)' : 'NO (30min polling)'}`)
   poll().catch((err) => console.error('Initial poll failed:', err.message))
-  setInterval(() => {
-    poll().catch((err) => console.error('Poll failed:', err.message))
-  }, POLL_INTERVAL)
+  scheduleNext()
 }
