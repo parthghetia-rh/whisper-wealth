@@ -66,7 +66,7 @@ function extractDates(text) {
 function parseBlockFormat(text) {
   const transactions = []
 
-  const blockRegex = /Type:\s*(?:Limit\s+|Market\s+|Fractional\s+|Stop\s+|Stop\s+Limit\s+)?(?<type>Buy|Sell)\s*\n\s*Symbol:\s*(?<ticker>[A-Z0-9.\-]+)\s*\n\s*Shares:\s*(?<shares>[\d,.]+)\s*\n\s*(?:Average\s+price|Price):\s*\$?(?<price>[\d,.]+)/gi
+  const blockRegex = /Type:\s*(?:Limit\s+|Market\s+|Fractional\s+|Stop\s+|Stop\s+Limit\s+)?(?<type>Buy|Sell)\s+Symbol:\s*(?<ticker>[A-Z0-9.\-]+)\s+Shares:\s*(?<shares>[\d,.]+)\s+(?:Average\s+price|Price):\s*\$?(?<price>[\d,.]+)/gi
 
   let match
   while ((match = blockRegex.exec(text)) !== null) {
