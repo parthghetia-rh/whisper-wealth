@@ -72,7 +72,7 @@ router.get('/income', (req, res) => {
       ticker,
       name: quote?.name || ticker,
       currency,
-      shares: h.shares,
+      shares: Math.round(h.shares * 10000) / 10000,
       current_price,
       market_value: Math.round(market_value * 100) / 100,
       dividend_rate: Math.round(annual_rate_per_share * 10000) / 10000,

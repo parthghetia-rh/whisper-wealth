@@ -63,7 +63,7 @@ router.get('/', (req, res) => {
       ticker: h.ticker,
       name: quote?.name || h.ticker,
       currency: quote?.currency || 'USD',
-      shares: h.shares,
+      shares: Math.round(h.shares * 10000) / 10000,
       avg_cost: Math.round(avg_cost * 100) / 100,
       current_price,
       market_value: Math.round(market_value * 100) / 100,

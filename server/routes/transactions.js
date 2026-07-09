@@ -35,7 +35,7 @@ function validateTransaction(body) {
 
 router.get('/', (req, res) => {
   const rows = stmtAll('SELECT * FROM transactions ORDER BY date DESC, id DESC')
-  res.json(rows)
+  res.json(rows.map((r) => ({ ...r, shares: Math.round(r.shares * 10000) / 10000 })))
 })
 
 router.post('/', (req, res) => {
