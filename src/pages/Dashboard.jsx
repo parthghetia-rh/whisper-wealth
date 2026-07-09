@@ -198,21 +198,21 @@ function SummaryCard({ label, value, sub, color, onClick }) {
   return (
     <div
       onClick={onClick}
-      className={`bg-surface-2 rounded-xl border border-border p-4 ${
-        onClick ? 'cursor-pointer hover:border-accent/50 transition-colors' : ''
+      className={`bg-gradient-to-br from-surface-2 to-surface-3/50 rounded-2xl border border-border/60 p-5 ${
+        onClick ? 'cursor-pointer hover:border-accent/40 transition-all duration-200' : ''
       }`}
     >
-      <div className="text-xs text-text-muted mb-1">{label}</div>
+      <div className="text-[10px] text-text-muted uppercase tracking-widest mb-1.5">{label}</div>
       <div
-        className={`text-lg font-semibold tabular-nums ${
+        className={`text-xl font-bold tabular-nums tracking-tight ${
           color === 'green' ? 'text-green' : color === 'red' ? 'text-red' : 'text-text'
         }`}
       >
         {value}
       </div>
       {sub && (
-        <div className={`text-xs mt-0.5 tabular-nums ${
-          color === 'green' ? 'text-green/70' : color === 'red' ? 'text-red/70' : 'text-text-muted'
+        <div className={`text-[11px] mt-1 tabular-nums ${
+          color === 'green' ? 'text-green/60' : color === 'red' ? 'text-red/60' : 'text-text-muted'
         }`}>
           {sub}
         </div>
