@@ -5,6 +5,7 @@ const yahooFinance = new YahooFinance({
 })
 
 const delay = (ms) => new Promise((r) => setTimeout(r, ms))
+const failedTickers = new Map()
 
 export async function getQuotes(tickers) {
   if (!tickers.length) return []
@@ -12,9 +13,18 @@ export async function getQuotes(tickers) {
   const results = []
   for (let i = 0; i < tickers.length; i++) {
     if (i > 0 && i % 5 === 0) await delay(1000)
+
+    const lastFail = failedTickers.get(tickers[i])
+    if (lastFail && Date.now() - lastFail < 6 * 60 * 60 * 1000) continue
     const ticker = tickers[i]
     try {
       const quote = await yahooFinance.quote(ticker)
+      if (!quote || !quote.symbol) {
+        console.error(`No data for ${ticker} — ticker may be invalid or delisted`)
+        failedTickers.set(ticker, Date.now())
+        continue
+      }
+      failedTickers.delete(ticker)
       results.push({
         ticker: quote.symbol,
         name: quote.shortName || quote.longName || ticker,
@@ -45,6 +55,9 @@ export async function getQuotes(tickers) {
       })
     } catch (err) {
       console.error(`Failed to fetch quote for ${ticker}:`, err.message)
+      if (err.message?.includes('delisted') || err.message?.includes('Not Found')) {
+        failedTickers.set(ticker, Date.now())
+      }
     }
   }
 
