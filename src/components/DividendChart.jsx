@@ -139,15 +139,26 @@ export function DividendHistoryChart({ history, currency }) {
       }
     })
 
-  const maxAmount = Math.max(...data.map((d) => d.amount))
-  const minAmount = Math.min(...data.map((d) => d.amount))
+  const amounts = data.map((d) => d.amount).sort((a, b) => a - b)
+  const median = amounts[Math.floor(amounts.length / 2)] || 0
+  const cappedMax = Math.min(
+    Math.max(...amounts),
+    median > 0 ? median * 3 : Math.max(...amounts)
+  )
+  const minAmount = Math.min(...amounts)
   const isGrowing = data.length >= 2 && data[data.length - 1].amount > data[0].amount
+
+  const chartData = data.map((d) => ({
+    ...d,
+    displayAmount: Math.min(d.amount, cappedMax),
+    isOutlier: d.amount > cappedMax,
+  }))
 
   return (
     <div className="px-4 pb-4 pt-2">
       <ResponsiveContainer width="100%" height={100}>
         <BarChart
-          data={data}
+          data={chartData}
           margin={{ top: 5, right: 5, bottom: 0, left: 5 }}
         >
           <XAxis
@@ -159,16 +170,16 @@ export function DividendHistoryChart({ history, currency }) {
           />
           <YAxis
             hide
-            domain={[minAmount * 0.9, maxAmount * 1.1]}
+            domain={[minAmount * 0.9, cappedMax * 1.1]}
           />
           <Tooltip
             content={<HistoryTooltip sym={sym} />}
             cursor={{ fill: 'rgba(255,255,255,0.03)' }}
           />
-          <Bar dataKey="amount" radius={[3, 3, 0, 0]} barSize={16}>
-            {data.map((entry, i) => {
-              const ratio = maxAmount > minAmount
-                ? (entry.amount - minAmount) / (maxAmount - minAmount)
+          <Bar dataKey="displayAmount" radius={[3, 3, 0, 0]} barSize={16}>
+            {chartData.map((entry, i) => {
+              const ratio = cappedMax > minAmount
+                ? (Math.min(entry.amount, cappedMax) - minAmount) / (cappedMax - minAmount)
                 : 1
               const opacity = 0.4 + ratio * 0.6
               return (
