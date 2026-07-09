@@ -22,7 +22,7 @@
 
 ---
 
-## Why WhisperWealth?
+## Why WhisperWealth??
 
 Most portfolio trackers require you to hand your financial data to a third party. WhisperWealth flips that — your data never leaves your machine. No cloud, no accounts, no tracking. Just a clean, fast dashboard running on your own hardware.
 
