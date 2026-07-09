@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { useApi, postApi, deleteApi } from '../hooks/useApi'
 import { currencySymbol } from '../utils/currency'
 import TickerChart from '../components/TickerChart'
-import StockCard from '../components/StockCard'
+import StockCard, { StockCardSkeleton } from '../components/StockCard'
 import TickerDetail from '../components/TickerDetail'
 
 const INTERVALS = [
@@ -330,7 +330,15 @@ export default function Watchlist() {
       ) : (
         <>
           {/* Mobile: card view */}
-          <div className="md:hidden space-y-2">
+          <div className="md:hidden space-y-2.5">
+            {refreshing && (
+              <div className="flex items-center justify-center gap-2 py-2 text-accent">
+                <svg className="animate-spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                  <path d="M12 2a10 10 0 0 1 10 10" />
+                </svg>
+                <span className="text-xs">Refreshing...</span>
+              </div>
+            )}
             <div className="flex items-center gap-2 mb-1">
               <span className="text-xs text-text-muted">Sort:</span>
               <select
@@ -366,12 +374,7 @@ export default function Watchlist() {
               const q = item.quote
               const isExpanded = expandedTicker === item.ticker
               if (!q) {
-                return (
-                  <div key={item.id} className="bg-surface-2 border border-border rounded-xl p-3.5 flex items-center justify-between">
-                    <span className="text-sm font-medium">{item.ticker}</span>
-                    <span className="text-xs text-text-muted">Loading...</span>
-                  </div>
-                )
+                return <StockCardSkeleton key={item.id} />
               }
               const moveUp = () => {
                 if (idx === 0) return
@@ -397,31 +400,32 @@ export default function Watchlist() {
                     flashing[q.ticker] === 'down' ? 'ring-1 ring-red/50' : ''
                   }`}
                 >
-                  <div className="relative">
-                    <StockCard
-                      item={{ ...q, periodChanges: item.periodChanges }}
-                      variant="watchlist"
-                      hasAction
-                      onClick={() => setExpandedTicker(isExpanded ? null : item.ticker)}
-                    />
-                    <div className="absolute top-1/2 -translate-y-1/2 right-3 flex flex-col gap-0.5">
-                      <button onClick={(e) => { e.stopPropagation(); moveUp() }}
-                        className="text-text-muted/40 hover:text-text p-0.5" title="Move up">
-                        <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><path d="M5 2L8.5 6.5H1.5z" /></svg>
-                      </button>
-                      <button onClick={(e) => { e.stopPropagation(); moveDown() }}
-                        className="text-text-muted/40 hover:text-text p-0.5" title="Move down">
-                        <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><path d="M5 8L1.5 3.5H8.5z" /></svg>
-                      </button>
-                      <button onClick={(e) => { e.stopPropagation(); handleDelete(item.id) }}
-                        className="text-text-muted hover:text-red transition-colors p-0.5" title="Remove">
-                        <TrashIcon />
-                      </button>
-                    </div>
-                  </div>
-                  {q.analyst_rating && (
-                    <div className="px-3.5 pb-1 -mt-1">
+                  <StockCard
+                    item={{ ...q, periodChanges: item.periodChanges }}
+                    variant="watchlist"
+                    onClick={() => setExpandedTicker(isExpanded ? null : item.ticker)}
+                  />
+                  {isExpanded && q.analyst_rating && (
+                    <div className="px-4 pt-1">
                       <AnalystBadge rating={q.analyst_rating} ticker={q.ticker} />
+                    </div>
+                  )}
+                  {isExpanded && (
+                    <div className="flex items-center justify-between px-4 py-1.5">
+                      <div className="flex gap-1">
+                        <button onClick={(e) => { e.stopPropagation(); moveUp() }}
+                          className="text-text-muted active:text-text p-2 rounded-lg active:bg-surface-3">
+                          <svg width="12" height="12" viewBox="0 0 10 10" fill="currentColor"><path d="M5 2L8.5 6.5H1.5z" /></svg>
+                        </button>
+                        <button onClick={(e) => { e.stopPropagation(); moveDown() }}
+                          className="text-text-muted active:text-text p-2 rounded-lg active:bg-surface-3">
+                          <svg width="12" height="12" viewBox="0 0 10 10" fill="currentColor"><path d="M5 8L1.5 3.5H8.5z" /></svg>
+                        </button>
+                      </div>
+                      <button onClick={(e) => { e.stopPropagation(); handleDelete(item.id) }}
+                        className="text-text-muted active:text-red p-2 rounded-lg active:bg-red/10 text-xs flex items-center gap-1">
+                        <TrashIcon /> Remove
+                      </button>
                     </div>
                   )}
                   {isExpanded && (
