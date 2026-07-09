@@ -64,7 +64,7 @@ async function fetchWatchlistQuotes() {
 }
 
 router.get('/', (req, res) => {
-  const rows = stmtAll('SELECT * FROM watchlist ORDER BY id')
+  const rows = stmtAll('SELECT * FROM watchlist ORDER BY sort_order ASC, id ASC')
   const result = rows.map((r) => ({
     ...r,
     quote: cachedQuotes[r.ticker] || null,
@@ -132,6 +132,16 @@ router.post('/', (req, res) => {
 
   fetchWatchlistQuotes().catch(() => {})
   res.status(201).json(row)
+})
+
+router.put('/reorder', (req, res) => {
+  const { order } = req.body
+  if (!Array.isArray(order)) return res.status(400).json({ error: 'Order must be an array of tickers' })
+
+  for (let i = 0; i < order.length; i++) {
+    stmtRun('UPDATE watchlist SET sort_order = ? WHERE ticker = ?', [i, order[i]])
+  }
+  res.json({ success: true })
 })
 
 router.put('/:id', (req, res) => {

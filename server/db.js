@@ -134,6 +134,7 @@ db.run(`
 
 try { db.run("ALTER TABLE watchlist ADD COLUMN list_name TEXT DEFAULT 'Default'") } catch {}
 try { db.run("ALTER TABLE watchlist ADD COLUMN note TEXT") } catch {}
+try { db.run("ALTER TABLE watchlist ADD COLUMN sort_order INTEGER DEFAULT 0") } catch {}
 
 db.run(`
   CREATE TABLE IF NOT EXISTS price_alerts (

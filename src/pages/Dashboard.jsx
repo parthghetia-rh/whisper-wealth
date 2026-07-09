@@ -8,6 +8,7 @@ import RefreshSelector from '../components/RefreshSelector'
 import { convertAmount, formatCurrency } from '../utils/currency'
 import AllocationBreakdown from '../components/AllocationBreakdown'
 import PerformanceTracker from '../components/PerformanceTracker'
+import DashboardWatchlist from '../components/DashboardWatchlist'
 
 const HIDDEN = '••••••'
 
@@ -132,10 +133,7 @@ export default function Dashboard() {
         </div>
       )}
 
-      <div>
-        <h3 className="text-sm font-medium text-text-muted mb-3">Holdings</h3>
-        <HoldingsTable holdings={holdings} showValues={showValues} />
-      </div>
+      <DashboardWatchlist holdings={holdings} showValues={showValues} />
     </div>
   )
 }

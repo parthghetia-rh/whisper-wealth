@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { useApi, postApi, deleteApi } from '../hooks/useApi'
+import { useApi, postApi, putApi, deleteApi } from '../hooks/useApi'
 import { currencySymbol } from '../utils/currency'
 import TickerChart from '../components/TickerChart'
 import StockCard, { StockCardSkeleton } from '../components/StockCard'
@@ -40,9 +40,7 @@ export default function Watchlist() {
   const [sortDir, setSortDir] = useState('desc')
   const [searchParams, setSearchParams] = useSearchParams()
   const [expandedTicker, setExpandedTicker] = useState(() => searchParams.get('ticker') || null)
-  const [customOrder, setCustomOrder] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('watchlist-order')) || null } catch { return null }
-  })
+  const [customOrder, setCustomOrder] = useState(null)
   const [streamingEnabled, setStreamingEnabled] = useState(() => localStorage.getItem('watchlist-streaming') !== 'false')
   const prevPricesRef = useRef({})
   const [flashing, setFlashing] = useState({})
@@ -119,16 +117,13 @@ export default function Watchlist() {
     }
   }
 
+  const saveOrder = async (order) => {
+    setCustomOrder(order)
+    try { await putApi('/api/watchlist/reorder', { order }) } catch {}
+  }
+
   const handleDelete = async (id) => {
     await deleteApi(`/api/watchlist/${id}`)
-    if (customOrder) {
-      const item = items.find((i) => i.id === id)
-      if (item) {
-        const updated = customOrder.filter((t) => t !== item.ticker)
-        setCustomOrder(updated)
-        localStorage.setItem('watchlist-order', JSON.stringify(updated))
-      }
-    }
     refetch()
   }
 
@@ -157,8 +152,7 @@ export default function Watchlist() {
     const [moved] = list.splice(dragIdx, 1)
     list.splice(idx, 0, moved)
     const order = list.map((i) => i.ticker)
-    setCustomOrder(order)
-    localStorage.setItem('watchlist-order', JSON.stringify(order))
+    saveOrder(order)
     setSortKey(null)
     setDragIdx(null)
     setOverIdx(null)
@@ -167,7 +161,6 @@ export default function Watchlist() {
 
   const resetOrder = () => {
     setCustomOrder(null)
-    localStorage.removeItem('watchlist-order')
     setSortKey(null)
   }
 
@@ -380,16 +373,14 @@ export default function Watchlist() {
                 if (idx === 0) return
                 const list = sortedItems.map((i) => i.ticker)
                 ;[list[idx - 1], list[idx]] = [list[idx], list[idx - 1]]
-                setCustomOrder(list)
-                localStorage.setItem('watchlist-order', JSON.stringify(list))
+                saveOrder(list)
                 setSortKey(null)
               }
               const moveDown = () => {
                 if (idx === sortedItems.length - 1) return
                 const list = sortedItems.map((i) => i.ticker)
                 ;[list[idx], list[idx + 1]] = [list[idx + 1], list[idx]]
-                setCustomOrder(list)
-                localStorage.setItem('watchlist-order', JSON.stringify(list))
+                saveOrder(list)
                 setSortKey(null)
               }
               return (
