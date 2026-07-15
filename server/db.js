@@ -159,14 +159,45 @@ db.run(`
   )
 `)
 
+let savePending = false
+let saveTimer = null
+
 function save() {
-  const data = db.export()
-  const tmp = dbPath + '.tmp'
-  writeFileSync(tmp, Buffer.from(data), { mode: 0o600 })
-  renameSync(tmp, dbPath)
+  if (saveTimer) return
+  savePending = true
+  saveTimer = setTimeout(flushSave, 1000)
 }
 
-save()
+function flushSave() {
+  saveTimer = null
+  if (!savePending) return
+  savePending = false
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const data = db.export()
+      const tmp = dbPath + '.tmp'
+      writeFileSync(tmp, Buffer.from(data), { mode: 0o600 })
+      renameSync(tmp, dbPath)
+      return
+    } catch (err) {
+      console.error(`DB save attempt ${attempt + 1} failed:`, err.message)
+      if (attempt < 2) {
+        const delay = (attempt + 1) * 500
+        const start = Date.now()
+        while (Date.now() - start < delay) {}
+      }
+    }
+  }
+  console.error('DB save failed after 3 attempts — data is in memory but not on disk')
+}
+
+function saveNow() {
+  if (saveTimer) { clearTimeout(saveTimer); saveTimer = null }
+  savePending = true
+  flushSave()
+}
+
+saveNow()
 
 function stmtAll(sql, params = []) {
   const stmt = db.prepare(sql)
@@ -201,5 +232,5 @@ function stmtRunBatch(sql, params = []) {
   return { lastInsertRowid, changes }
 }
 
-export { stmtAll, stmtGet, stmtRun, stmtRunBatch, save }
+export { stmtAll, stmtGet, stmtRun, stmtRunBatch, save, saveNow }
 export default db

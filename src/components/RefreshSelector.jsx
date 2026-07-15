@@ -25,39 +25,27 @@ export default function RefreshSelector({ onTick }) {
     localStorage.setItem(STORAGE_KEY, String(interval))
   }, [interval])
 
-  useEffect(() => {
-    if (!interval) return
-
-    const tick = async () => {
-      setRefreshing(true)
-      try {
-        await postApi('/api/portfolio/quick-refresh', {})
-      } catch {}
-      await new Promise((r) => setTimeout(r, 2000))
-      onTickRef.current?.()
-      setLastRefresh(new Date())
-      setRefreshing(false)
-    }
-
-    const id = setInterval(tick, interval)
-    return () => clearInterval(id)
-  }, [interval])
-
-  const handleManualRefresh = async () => {
+  const doRefresh = async () => {
+    if (refreshing) return
     setRefreshing(true)
     try {
       await postApi('/api/portfolio/quick-refresh', {})
     } catch {}
-    await new Promise((r) => setTimeout(r, 2000))
     onTickRef.current?.()
     setLastRefresh(new Date())
     setRefreshing(false)
   }
 
+  useEffect(() => {
+    if (!interval) return
+    const id = setInterval(doRefresh, interval)
+    return () => clearInterval(id)
+  }, [interval])
+
   return (
     <div className="flex items-center gap-2">
       <button
-        onClick={handleManualRefresh}
+        onClick={doRefresh}
         disabled={refreshing}
         className="p-1.5 rounded-lg text-text-muted hover:text-text hover:bg-surface-3 transition-colors disabled:opacity-50"
         title="Refresh now"

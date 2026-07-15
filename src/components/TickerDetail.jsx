@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { postApi, putApi } from '../hooks/useApi'
-import { currencySymbol } from '../utils/currency'
+import { useApi, postApi, putApi } from '../hooks/useApi'
+import { currencySymbol, formatCurrency } from '../utils/currency'
 
 export default function TickerDetail({ quote, item, onUpdate }) {
   const [note, setNote] = useState(item?.note || '')
@@ -8,9 +8,16 @@ export default function TickerDetail({ quote, item, onUpdate }) {
   const [alertPrice, setAlertPrice] = useState('')
   const [alertCondition, setAlertCondition] = useState('below')
 
+  const { data: holdings } = useApi('/api/portfolio')
+  const { data: transactions } = useApi('/api/transactions')
+
   if (!quote) return null
 
   const sym = currencySymbol(quote.currency)
+  const holding = holdings?.find((h) => h.ticker === quote.ticker)
+  const tickerTxns = (transactions || [])
+    .filter((t) => t.ticker === quote.ticker)
+    .slice(0, 5)
 
   const saveNote = async () => {
     setNoteSaving(true)
@@ -56,6 +63,56 @@ export default function TickerDetail({ quote, item, onUpdate }) {
 
   return (
     <div className="bg-surface-3/30 px-4 py-3 space-y-3 text-xs">
+      {holding && (
+        <div className="bg-surface-2/50 rounded-lg p-3">
+          <p className="text-[9px] text-text-muted uppercase tracking-widest mb-2">Your Position</p>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div>
+              <span className="text-text-muted">Shares</span>
+              <div className="font-medium tabular-nums">{holding.shares}</div>
+            </div>
+            <div>
+              <span className="text-text-muted">Avg Cost</span>
+              <div className="font-medium tabular-nums">{sym}{holding.avg_cost.toFixed(2)}</div>
+            </div>
+            <div>
+              <span className="text-text-muted">Market Value</span>
+              <div className="font-medium tabular-nums">{formatCurrency(holding.market_value, quote.currency)}</div>
+            </div>
+            <div>
+              <span className="text-text-muted">Gain/Loss</span>
+              <div className={`font-medium tabular-nums ${holding.gain_loss >= 0 ? 'text-green' : 'text-red'}`}>
+                {holding.gain_loss >= 0 ? '+' : ''}{formatCurrency(holding.gain_loss, quote.currency)}
+                <span className="text-text-muted ml-1">({holding.gain_loss_percent.toFixed(2)}%)</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {tickerTxns.length > 0 && (
+        <div className="bg-surface-2/50 rounded-lg p-3">
+          <p className="text-[9px] text-text-muted uppercase tracking-widest mb-2">
+            Recent Transactions {tickerTxns.length < (transactions || []).filter((t) => t.ticker === quote.ticker).length && '(last 5)'}
+          </p>
+          <div className="space-y-1">
+            {tickerTxns.map((t) => (
+              <div key={t.id} className="flex items-center justify-between py-0.5">
+                <div className="flex items-center gap-2">
+                  <span className={`px-1.5 py-0.5 rounded text-[9px] font-medium ${
+                    t.type === 'buy' ? 'bg-green/15 text-green' : 'bg-red/15 text-red'
+                  }`}>
+                    {t.type.toUpperCase()}
+                  </span>
+                  <span className="tabular-nums">{t.shares} @ {sym}{t.price_per_share.toFixed(2)}</span>
+                </div>
+                <span className="text-text-muted tabular-nums">{t.date}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div>
           <span className="text-text-muted">Market Cap</span>
@@ -66,9 +123,7 @@ export default function TickerDetail({ quote, item, onUpdate }) {
           <div className="font-medium">
             {formatVol(quote.volume)}
             {quote.avg_volume && (
-              <span className="text-text-muted ml-1">
-                (avg {formatVol(quote.avg_volume)})
-              </span>
+              <span className="text-text-muted ml-1">(avg {formatVol(quote.avg_volume)})</span>
             )}
           </div>
         </div>
