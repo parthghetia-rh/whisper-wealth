@@ -84,15 +84,15 @@ export default function Watchlist() {
     try {
       await postApi('/api/watchlist/refresh', {})
     } catch {}
-    await new Promise((r) => setTimeout(r, 1500))
     refetchRef.current()
     setLastRefresh(new Date())
     setRefreshing(false)
   }, [])
 
   useEffect(() => {
-    doRefresh()
-  }, [doRefresh])
+    const timer = setTimeout(doRefresh, 500)
+    return () => clearTimeout(timer)
+  }, [])
 
   useEffect(() => {
     if (!interval) return
@@ -108,7 +108,6 @@ export default function Watchlist() {
     try {
       await postApi('/api/watchlist', { ticker: ticker.trim(), list_name: listName.trim() || undefined })
       setTicker('')
-      await new Promise((r) => setTimeout(r, 2000))
       refetch()
     } catch (err) {
       setError(err.message)

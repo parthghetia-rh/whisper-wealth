@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { currencySymbol } from '../utils/currency'
 import StockCard from './StockCard'
+import TickerChart from './TickerChart'
+import TickerDetail from './TickerDetail'
 
 const COLUMNS = [
   { key: 'ticker', label: 'Ticker', align: 'left' },
@@ -27,6 +29,7 @@ const HIDDEN = '••••••'
 export default function HoldingsTable({ holdings, showValues = true }) {
   const [sortKey, setSortKey] = useState(null)
   const [sortDir, setSortDir] = useState('desc')
+  const [expandedTicker, setExpandedTicker] = useState(null)
 
   if (!holdings?.length) {
     return (
@@ -105,9 +108,25 @@ export default function HoldingsTable({ holdings, showValues = true }) {
 
             {/* Mobile: card view */}
             <div className="md:hidden space-y-2">
-              {items.map((h) => (
-                <StockCard key={h.ticker} item={h} variant="holding" showValues={showValues} />
-              ))}
+              {items.map((h) => {
+                const isExpanded = expandedTicker === h.ticker
+                return (
+                  <div key={h.ticker}>
+                    <StockCard
+                      item={h}
+                      variant="holding"
+                      showValues={showValues}
+                      onClick={() => setExpandedTicker(isExpanded ? null : h.ticker)}
+                    />
+                    {isExpanded && (
+                      <div className="mt-1 rounded-xl border border-border overflow-hidden">
+                        <TickerChart ticker={h.ticker} currency={h.currency} />
+                        <TickerDetail quote={h} item={{ id: h.ticker, ticker: h.ticker }} />
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
             </div>
 
             {/* Desktop: table view */}
@@ -134,10 +153,15 @@ export default function HoldingsTable({ holdings, showValues = true }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {items.map((h) => (
+                  {items.map((h) => {
+                    const isExpanded = expandedTicker === h.ticker
+                    return (<>
                     <tr
                       key={h.ticker}
-                      className="border-b border-border/50 hover:bg-surface-3/50 transition-colors"
+                      onClick={() => setExpandedTicker(isExpanded ? null : h.ticker)}
+                      className={`border-b border-border/50 cursor-pointer transition-colors ${
+                        isExpanded ? 'bg-surface-3/40' : 'hover:bg-surface-3/50'
+                      }`}
                     >
                       <td className="p-3 pl-4">
                         <div className="font-medium">{h.ticker}</div>
@@ -178,7 +202,16 @@ export default function HoldingsTable({ holdings, showValues = true }) {
                         {h.dividend_yield.toFixed(2)}%
                       </td>
                     </tr>
-                  ))}
+                    {isExpanded && (
+                      <tr key={`${h.ticker}-detail`}>
+                        <td colSpan={8} className="p-0">
+                          <TickerChart ticker={h.ticker} currency={h.currency} />
+                          <TickerDetail quote={h} item={{ id: h.ticker, ticker: h.ticker }} />
+                        </td>
+                      </tr>
+                    )}
+                    </>)
+                  })}
                 </tbody>
               </table>
             </div>
