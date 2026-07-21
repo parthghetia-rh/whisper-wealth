@@ -2,7 +2,6 @@ import { Router } from 'express'
 import { stmtAll, stmtGet } from '../db.js'
 import { addSSEClient, triggerPoll, triggerQuickRefresh, getRates } from '../services/poller.js'
 import { getSettingBool } from './settings.js'
-import { getChartData } from '../services/stockService.js'
 
 const router = Router()
 
@@ -220,41 +219,29 @@ router.get('/snapshot', (req, res) => {
   })
 })
 
-router.get('/history', async (req, res) => {
+router.get('/history', (req, res) => {
   const range = ['1m', '3m', '6m', '1y'].includes(req.query.range) ? req.query.range : '1y'
-  const holdings = getHoldings()
-  if (!holdings.length) return res.json({ data: [], range })
+  const months = { '1m': 1, '3m': 3, '6m': 6, '1y': 12 }[range] || 12
+  const cutoff = new Date()
+  cutoff.setMonth(cutoff.getMonth() - months)
+  const cutoffStr = cutoff.toISOString().split('T')[0]
+
+  const snapshots = stmtAll(
+    'SELECT * FROM portfolio_snapshots WHERE date >= ? ORDER BY date ASC',
+    [cutoffStr]
+  )
+
+  if (!snapshots.length) {
+    return res.json({ data: [], range })
+  }
 
   try {
-    const allCharts = {}
-    for (const h of holdings) {
-      allCharts[h.ticker] = await getChartData(h.ticker, range)
-    }
-
-    const allDates = new Set()
-    for (const points of Object.values(allCharts)) {
-      for (const p of points) allDates.add(p.date)
-    }
-    const dates = [...allDates].sort()
-
-    const lastPrice = {}
-    const data = dates.map((date) => {
-      let totalValue = 0
-      let totalCost = 0
-      for (const h of holdings) {
-        const point = allCharts[h.ticker]?.find((p) => p.date === date)
-        if (point) lastPrice[h.ticker] = point.close
-        const price = lastPrice[h.ticker] || 0
-        totalValue += h.shares * price
-        totalCost += h.total_cost
-      }
-      return {
-        date,
-        value: Math.round(totalValue * 100) / 100,
-        cost: Math.round(totalCost * 100) / 100,
-        gain: Math.round((totalValue - totalCost) * 100) / 100,
-      }
-    })
+    const data = snapshots.map((s) => ({
+      date: s.date,
+      value: s.total_value,
+      cost: s.total_cost,
+      gain: s.total_gain,
+    }))
 
     res.json({ data, range })
   } catch (err) {

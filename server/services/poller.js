@@ -238,18 +238,22 @@ function syncPortfolioToWatchlist() {
 }
 
 function scheduleNext() {
-  const interval = isMarketHours() ? MARKET_POLL_INTERVAL : AFTER_HOURS_POLL_INTERVAL
+  if (!isMarketHours()) {
+    console.log('After hours — polling paused. Use manual refresh.')
+    setTimeout(scheduleNext, 5 * 60 * 1000)
+    return
+  }
   setTimeout(() => {
     poll()
       .catch((err) => console.error('Poll failed:', err.message))
       .finally(scheduleNext)
-  }, interval)
+  }, MARKET_POLL_INTERVAL)
 }
 
 export function startPoller() {
   cleanupDRIP()
   syncPortfolioToWatchlist()
-  console.log(`Market hours: ${isMarketHours() ? 'YES (5min polling)' : 'NO (30min polling)'}`)
+  console.log(`Market hours: ${isMarketHours() ? 'YES (5min auto-polling)' : 'NO (manual refresh only)'}`)
   poll().catch((err) => console.error('Initial poll failed:', err.message))
   scheduleNext()
 }
