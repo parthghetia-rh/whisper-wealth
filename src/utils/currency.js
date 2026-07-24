@@ -16,7 +16,8 @@ export function currencySymbol(code) {
 }
 
 export function convertAmount(amount, from, to, rates) {
-  if (from === to || !rates[from] || !rates[to]) return amount
+  if (from === to) return amount
+  if (!rates[from] || !rates[to]) return 0
   return (amount * rates[from]) / rates[to]
 }
 

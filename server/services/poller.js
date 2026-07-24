@@ -58,6 +58,13 @@ async function poll() {
   const hasCash = stmtAll('SELECT 1 FROM cash_positions LIMIT 1').length > 0
   if (!tickers.length && !hasCash) return
 
+  const cashCurrencies = stmtAll('SELECT DISTINCT currency FROM cash_positions').map((r) => r.currency)
+  const quoteCurrencies = stmtAll('SELECT DISTINCT currency FROM quotes').map((r) => r.currency)
+  const allCurrencies = [...new Set([...quoteCurrencies, ...cashCurrencies])]
+  if (allCurrencies.length) {
+    latestRates = await getExchangeRates(allCurrencies)
+  }
+
   const quotes = tickers.length ? await getQuotes(tickers) : []
   if (tickers.length) {
     console.log(`Polling quotes for: ${tickers.join(', ')}`)
@@ -94,13 +101,6 @@ async function poll() {
           )
         } catch {}
       }
-    }
-
-    const quoteCurrencies = quotes.map((q) => q.currency)
-    const cashCurrencies = stmtAll('SELECT DISTINCT currency FROM cash_positions').map((r) => r.currency)
-    const allCurrencies = [...new Set([...quoteCurrencies, ...cashCurrencies])]
-    if (allCurrencies.length) {
-      latestRates = await getExchangeRates(allCurrencies)
     }
 
     takeSnapshot()
