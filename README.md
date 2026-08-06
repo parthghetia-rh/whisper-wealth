@@ -197,6 +197,35 @@ WhisperWealth is a Progressive Web App (PWA). On your phone:
 
 This gives you a full-screen app experience with the WhisperWealth icon on your home screen.
 
+## Biometric Lock
+
+WhisperWealth supports device biometric authentication to protect your portfolio from prying eyes.
+
+**Supported methods:**
+
+| Device | Method |
+|--------|--------|
+| Android (Chrome) | Fingerprint |
+| Windows (Edge/Chrome) | Windows Hello (fingerprint, face, PIN) |
+| macOS (Safari/Chrome) | Touch ID |
+| iOS (Safari) | Face ID / Touch ID |
+
+**To enable:**
+
+1. Log in to WhisperWealth
+2. Go to **Settings** → **Security**
+3. Toggle **Biometric lock** ON
+4. Your device will prompt you to register your fingerprint/face
+5. Done — the app will require biometric verification every time you open it
+
+**How it works:**
+
+- Uses the [Web Authentication API (WebAuthn)](https://developer.mozilla.org/en-US/docs/Web/API/Web_Authentication_API) — no biometric data leaves your device
+- The auth token remains in your browser (you're still authenticated to the server)
+- The biometric just gates the UI — prevents someone from opening your browser and seeing your portfolio
+- Disable anytime in Settings
+- If you clear browser data, you'll need to re-register
+
 ## Configuration
 
 | Environment Variable | Default | Description |

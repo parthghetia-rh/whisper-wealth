@@ -10,12 +10,18 @@ import Settings from './pages/Settings'
 import Milestones from './pages/Milestones'
 import Expenses from './pages/Expenses'
 import Login from './pages/Login'
+import BiometricLock, { isBiometricEnabled } from './components/BiometricLock'
 
 export default function App() {
   const [authed, setAuthed] = useState(() => !!localStorage.getItem('folio-auth-token'))
+  const [locked, setLocked] = useState(() => authed && isBiometricEnabled())
 
   if (!authed) {
-    return <Login onLogin={() => setAuthed(true)} />
+    return <Login onLogin={() => { setAuthed(true); setLocked(isBiometricEnabled()) }} />
+  }
+
+  if (locked) {
+    return <BiometricLock onUnlock={() => setLocked(false)} />
   }
 
   return (
