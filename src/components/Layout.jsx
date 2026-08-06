@@ -331,61 +331,18 @@ export default function Layout({ onLogout }) {
           </NavLink>
           <div className="flex items-center gap-1">
             <NotificationBell />
-            <button
-              onClick={() => setSettingsOpen(!settingsOpen)}
-            className="p-1.5 text-text-muted hover:text-text"
-          >
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="9" cy="9" r="2.5" />
-              <path d="M9 1.5v2M9 14.5v2M1.5 9h2M14.5 9h2M3.4 3.4l1.4 1.4M13.2 13.2l1.4 1.4M3.4 14.6l1.4-1.4M13.2 4.8l1.4-1.4" />
-            </svg>
-          </button>
+            <NavLink
+              to="/settings"
+              className="p-1.5 text-text-muted hover:text-text"
+            >
+              <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="9" cy="9" r="2.5" />
+                <path d="M9 1.5v2M9 14.5v2M1.5 9h2M14.5 9h2M3.4 3.4l1.4 1.4M13.2 13.2l1.4 1.4M3.4 14.6l1.4-1.4M13.2 4.8l1.4-1.4" />
+              </svg>
+            </NavLink>
           </div>
         </div>
 
-        {/* Mobile settings dropdown */}
-        {settingsOpen && (
-          <div className="md:hidden bg-surface-2 border-b border-border px-4 pb-3 space-y-2">
-            <div className="flex gap-2 flex-wrap">
-              {Object.entries(themes).map(([id, theme]) => (
-                <button
-                  key={id}
-                  onClick={() => {
-                    setCurrentTheme(id)
-                    setSettingsOpen(false)
-                  }}
-                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs transition-colors ${
-                    currentTheme === id
-                      ? 'bg-accent/15 text-accent-hover font-medium'
-                      : 'bg-surface-3 text-text-muted'
-                  }`}
-                >
-                  <div
-                    className="w-2.5 h-2.5 rounded-full"
-                    style={{ backgroundColor: theme.swatch }}
-                  />
-                  {theme.label}
-                </button>
-              ))}
-            </div>
-            <div className="flex gap-3">
-              <NavLink
-                to="/settings"
-                onClick={() => setSettingsOpen(false)}
-                className="text-xs text-accent hover:text-accent-hover transition-colors"
-              >
-                Settings
-              </NavLink>
-              {onLogout && (
-                <button
-                  onClick={onLogout}
-                  className="text-xs text-text-muted hover:text-red transition-colors"
-                >
-                  Log out
-                </button>
-              )}
-            </div>
-          </div>
         )}
 
         <main className="flex-1 overflow-auto p-4 md:p-6 pb-20 md:pb-6">
