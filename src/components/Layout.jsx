@@ -343,8 +343,6 @@ export default function Layout({ onLogout }) {
           </div>
         </div>
 
-        )}
-
         <main className="flex-1 overflow-auto p-4 md:p-6 pb-20 md:pb-6">
           <Outlet />
         </main>
