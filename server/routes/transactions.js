@@ -8,6 +8,10 @@ const router = Router()
 const TICKER_RE = /^[A-Z0-9.\-]{1,20}$/
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
 
+function refreshAfterChange() {
+  triggerPoll().catch((err) => console.error('Market refresh after transaction failed:', err.message))
+}
+
 function validateTransaction(body) {
   const { ticker, type, shares, price_per_share, date } = body
 
@@ -55,7 +59,7 @@ router.post('/', (req, res) => {
 
   const existingQuote = stmtGet('SELECT 1 FROM quotes WHERE ticker = ?', [sanitizedTicker])
   if (!existingQuote) {
-    triggerPoll()
+    refreshAfterChange()
   }
 
   const inWatchlist = stmtGet('SELECT 1 FROM watchlist WHERE ticker = ?', [sanitizedTicker])
@@ -91,7 +95,7 @@ router.put('/:id', (req, res) => {
 
   if (sanitizedTicker !== existing.ticker) {
     const hasQuote = stmtGet('SELECT 1 FROM quotes WHERE ticker = ?', [sanitizedTicker])
-    if (!hasQuote) triggerPoll()
+    if (!hasQuote) refreshAfterChange()
   }
 
   res.json(row)
@@ -198,7 +202,7 @@ router.post('/import', (req, res) => {
     imported++
   }
   save()
-  triggerPoll()
+  refreshAfterChange()
 
   res.json({ imported, skipped: result.skipped.length, skippedDetails: result.skipped })
 })

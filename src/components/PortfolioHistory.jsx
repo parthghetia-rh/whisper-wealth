@@ -17,7 +17,7 @@ export default function PortfolioHistory({ displayCurrency, mode, onClose }) {
   useEffect(() => {
     setLoading(true)
     const token = localStorage.getItem('folio-auth-token')
-    fetch(`/api/portfolio/history?range=${range}`, {
+    fetch(`/api/portfolio/history?range=${range}&currency=${encodeURIComponent(displayCurrency)}`, {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((r) => r.json())
@@ -26,7 +26,7 @@ export default function PortfolioHistory({ displayCurrency, mode, onClose }) {
         setLoading(false)
       })
       .catch(() => setLoading(false))
-  }, [range])
+  }, [range, displayCurrency])
 
   const dataKey = mode === 'gain' ? 'gain' : 'value'
   const label = mode === 'gain' ? 'Gain/Loss' : 'Portfolio Value'

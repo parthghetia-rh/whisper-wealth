@@ -33,14 +33,9 @@ function safeCompare(a, b) {
 
 export function authMiddleware(req, res, next) {
   const header = req.headers.authorization
-  const queryToken = req.query.token
-
   const headerToken = header?.startsWith('Bearer ') ? header.slice(7) : null
 
-  if (
-    (headerToken && safeCompare(headerToken, authToken)) ||
-    (queryToken && safeCompare(queryToken, authToken))
-  ) {
+  if (headerToken && safeCompare(headerToken, authToken)) {
     return next()
   }
   return res.status(401).json({ error: 'Unauthorized' })

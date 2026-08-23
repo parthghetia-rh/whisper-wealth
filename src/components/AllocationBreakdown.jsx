@@ -21,13 +21,14 @@ export default function AllocationBreakdown({
 
   if (!holdings?.length) return null
 
-  const totalValue = holdings.reduce((sum, h) => {
+  const pricedHoldings = holdings.filter((holding) => holding.market_value != null)
+  const totalValue = pricedHoldings.reduce((sum, h) => {
     return sum + convertAmount(h.market_value, h.currency, displayCurrency, rates)
   }, 0)
 
   if (totalValue <= 0) return null
 
-  const items = holdings
+  const items = pricedHoldings
     .map((h, i) => {
       const converted = convertAmount(h.market_value, h.currency, displayCurrency, rates)
       const pct = (converted / totalValue) * 100
@@ -142,4 +143,3 @@ function ChartTooltip({ active, payload, displayCurrency, showValues }) {
     </div>
   )
 }
-

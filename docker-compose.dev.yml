@@ -6,13 +6,23 @@ services:
       - "127.0.0.1:3000:3000"
     volumes:
       - folio-data:/data
+      - ./backups:/backups
     environment:
       - NODE_ENV=production
       - HOST=0.0.0.0
       - PORT=3000
       - DB_PATH=/data/portfolio.db
       - TOKEN_PATH=/data/.auth-token
+      - BACKUP_DIR=/backups
+      - BACKUP_RETENTION_DAYS=14
+      - YAHOO_MAX_REQUESTS_PER_MINUTE=8
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
 
 volumes:
   folio-data:

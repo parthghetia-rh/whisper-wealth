@@ -1,10 +1,25 @@
 import initSqlJs from 'sql.js'
-import { readFileSync, writeFileSync, renameSync, existsSync } from 'fs'
+import {
+  readFileSync, writeFileSync, renameSync, existsSync, mkdirSync,
+  copyFileSync, readdirSync, unlinkSync, statSync, accessSync, constants,
+} from 'fs'
 import { dirname, join } from 'path'
 import { fileURLToPath } from 'url'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const dbPath = process.env.DB_PATH || join(__dirname, '..', 'portfolio.db')
+let backupDir = process.env.BACKUP_DIR || join(dirname(dbPath), 'backups')
+const backupRetentionDays = Math.max(1, Number(process.env.BACKUP_RETENTION_DAYS) || 14)
+
+try {
+  mkdirSync(backupDir, { recursive: true })
+  accessSync(backupDir, constants.W_OK)
+} catch {
+  const fallback = join(dirname(dbPath), 'backups')
+  console.warn(`Backup directory ${backupDir} is not writable; using ${fallback}`)
+  backupDir = fallback
+  mkdirSync(backupDir, { recursive: true })
+}
 
 const SQL = await initSqlJs()
 
@@ -17,6 +32,19 @@ if (existsSync(dbPath)) {
 }
 
 db.run('PRAGMA foreign_keys = ON')
+
+const currentSchemaVersion = db.exec('PRAGMA user_version')[0]?.values?.[0]?.[0] || 0
+if (existsSync(dbPath) && currentSchemaVersion < 2) {
+  try {
+    mkdirSync(backupDir, { recursive: true })
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-')
+    const target = join(backupDir, `portfolio-pre-migration-${stamp}.db`)
+    copyFileSync(dbPath, target)
+    console.log(`Created pre-migration backup: ${target}`)
+  } catch (err) {
+    throw new Error(`Unable to create pre-migration backup: ${err.message}`)
+  }
+}
 
 db.run(`
   CREATE TABLE IF NOT EXISTS transactions (
@@ -47,6 +75,44 @@ db.run(`
 `)
 
 try { db.run("ALTER TABLE quotes ADD COLUMN currency TEXT DEFAULT 'USD'") } catch {}
+
+function ensureColumn(table, column, definition) {
+  const columns = db.exec(`PRAGMA table_info(${table})`)[0]?.values || []
+  if (!columns.some((row) => row[1] === column)) {
+    db.run(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`)
+  }
+}
+
+ensureColumn('quotes', 'provider_symbol', 'TEXT')
+ensureColumn('quotes', 'regular_market_price', 'REAL')
+ensureColumn('quotes', 'pre_market_price', 'REAL')
+ensureColumn('quotes', 'pre_market_change', 'REAL')
+ensureColumn('quotes', 'pre_market_change_percent', 'REAL')
+ensureColumn('quotes', 'post_market_price', 'REAL')
+ensureColumn('quotes', 'post_market_change', 'REAL')
+ensureColumn('quotes', 'post_market_change_percent', 'REAL')
+ensureColumn('quotes', 'market_state', 'TEXT')
+ensureColumn('quotes', 'price_source', "TEXT DEFAULT 'regular'")
+ensureColumn('quotes', 'day_high', 'REAL')
+ensureColumn('quotes', 'day_low', 'REAL')
+ensureColumn('quotes', 'fifty_two_week_high', 'REAL')
+ensureColumn('quotes', 'fifty_two_week_low', 'REAL')
+ensureColumn('quotes', 'volume', 'REAL')
+ensureColumn('quotes', 'avg_volume', 'REAL')
+ensureColumn('quotes', 'analyst_rating', 'TEXT')
+ensureColumn('quotes', 'provider_updated_at', 'TEXT')
+ensureColumn('quotes', 'last_success_at', 'TEXT')
+ensureColumn('quotes', 'status', "TEXT DEFAULT 'unavailable'")
+ensureColumn('quotes', 'last_error', 'TEXT')
+
+db.run(`
+  UPDATE quotes
+  SET regular_market_price = COALESCE(regular_market_price, price),
+      provider_symbol = COALESCE(provider_symbol, ticker),
+      last_success_at = COALESCE(last_success_at, updated_at),
+      status = CASE WHEN price IS NOT NULL AND price > 0 THEN 'stale' ELSE 'unavailable' END
+  WHERE provider_symbol IS NULL OR regular_market_price IS NULL OR last_success_at IS NULL
+`)
 
 db.run(`
   CREATE TABLE IF NOT EXISTS dividends (
@@ -95,6 +161,56 @@ db.run(`
     annual_dividends REAL,
     positions INTEGER,
     updated_at TEXT DEFAULT (datetime('now'))
+  )
+`)
+
+db.run(`
+  CREATE TABLE IF NOT EXISTS portfolio_snapshots_v2 (
+    date TEXT NOT NULL,
+    currency TEXT NOT NULL,
+    total_value REAL NOT NULL DEFAULT 0,
+    total_cost REAL NOT NULL DEFAULT 0,
+    annual_dividends REAL NOT NULL DEFAULT 0,
+    positions INTEGER NOT NULL DEFAULT 0,
+    updated_at TEXT DEFAULT (datetime('now')),
+    PRIMARY KEY(date, currency)
+  )
+`)
+
+db.run(`
+  CREATE TABLE IF NOT EXISTS snapshot_fx_rates (
+    date TEXT NOT NULL,
+    currency TEXT NOT NULL,
+    usd_rate REAL NOT NULL,
+    updated_at TEXT DEFAULT (datetime('now')),
+    PRIMARY KEY(date, currency)
+  )
+`)
+
+db.run(`
+  CREATE TABLE IF NOT EXISTS fx_rates (
+    currency TEXT PRIMARY KEY,
+    usd_rate REAL NOT NULL,
+    provider_updated_at TEXT,
+    updated_at TEXT DEFAULT (datetime('now'))
+  )
+`)
+
+db.run(`
+  CREATE TABLE IF NOT EXISTS period_changes (
+    ticker TEXT PRIMARY KEY,
+    change_3m REAL,
+    change_6m REAL,
+    change_1y REAL,
+    updated_at TEXT DEFAULT (datetime('now'))
+  )
+`)
+
+db.run(`
+  CREATE TABLE IF NOT EXISTS enrichment_state (
+    ticker TEXT PRIMARY KEY,
+    period_date TEXT,
+    dividend_date TEXT
   )
 `)
 
@@ -161,6 +277,8 @@ db.run(`
 
 let savePending = false
 let saveTimer = null
+let lastSaveError = null
+let saveExportCount = 0
 
 function save() {
   if (saveTimer) return
@@ -178,14 +296,12 @@ function flushSave() {
       const tmp = dbPath + '.tmp'
       writeFileSync(tmp, Buffer.from(data), { mode: 0o600 })
       renameSync(tmp, dbPath)
+      lastSaveError = null
+      saveExportCount++
       return
     } catch (err) {
       console.error(`DB save attempt ${attempt + 1} failed:`, err.message)
-      if (attempt < 2) {
-        const delay = (attempt + 1) * 500
-        const start = Date.now()
-        while (Date.now() - start < delay) {}
-      }
+      lastSaveError = err.message
     }
   }
   console.error('DB save failed after 3 attempts — data is in memory but not on disk')
@@ -196,8 +312,6 @@ function saveNow() {
   savePending = true
   flushSave()
 }
-
-saveNow()
 
 function stmtAll(sql, params = []) {
   const stmt = db.prepare(sql)
@@ -232,5 +346,59 @@ function stmtRunBatch(sql, params = []) {
   return { lastInsertRowid, changes }
 }
 
-export { stmtAll, stmtGet, stmtRun, stmtRunBatch, save, saveNow }
+function transaction(callback) {
+  db.run('BEGIN')
+  try {
+    const result = callback()
+    db.run('COMMIT')
+    save()
+    return result
+  } catch (err) {
+    try { db.run('ROLLBACK') } catch {}
+    throw err
+  }
+}
+
+function pruneBackups() {
+  if (!existsSync(backupDir)) return
+  const cutoff = Date.now() - backupRetentionDays * 24 * 60 * 60 * 1000
+  for (const name of readdirSync(backupDir)) {
+    if (!/^portfolio-(daily|pre-migration)-.*\.db$/.test(name)) continue
+    const target = join(backupDir, name)
+    if (statSync(target).mtimeMs < cutoff) unlinkSync(target)
+  }
+}
+
+function createBackup(kind = 'daily') {
+  mkdirSync(backupDir, { recursive: true })
+  const date = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Toronto', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).format(new Date())
+  const target = join(backupDir, `portfolio-${kind}-${date}.db`)
+  if (kind === 'daily' && existsSync(target)) return target
+  const tmp = `${target}.tmp`
+  writeFileSync(tmp, Buffer.from(db.export()), { mode: 0o600 })
+  renameSync(tmp, target)
+  pruneBackups()
+  return target
+}
+
+function getDbHealth() {
+  return {
+    path: dbPath,
+    persisted: existsSync(dbPath),
+    last_save_error: lastSaveError,
+    backup_dir: backupDir,
+    retention_days: backupRetentionDays,
+    save_exports: saveExportCount,
+  }
+}
+
+db.run('PRAGMA user_version = 2')
+saveNow()
+
+export {
+  stmtAll, stmtGet, stmtRun, stmtRunBatch, transaction, save, saveNow,
+  createBackup, getDbHealth,
+}
 export default db

@@ -28,7 +28,7 @@ Most portfolio trackers require you to hand your financial data to a third party
 
 - **Zero data collection** — No telemetry, analytics, or cookies. Ever.
 - **One-command deploy** — `docker compose up -d` and you're running.
-- **Live market dashboard** — Real-time prices with configurable refresh (10s to 5min), pre-market and after-hours data, SSE push updates.
+- **Live market dashboard** — Batched near-real-time Yahoo prices, pre/after-hours data, authenticated SSE updates, and visible freshness status.
 - **True income projections** — Dividends from actual payment history + cash interest (simple/compound) + recurring income, all converted to your display currency.
 - **Broker agnostic** — Import from any broker via CSV/TSV column mapper or printed email PDFs with auto-extraction.
 - **Multi-currency native** — Track CAD, USD, INR, EUR, GBP holdings side by side with live forex conversion. Add forex pairs (CADUSD=X) to your watchlist.
@@ -43,7 +43,7 @@ Most portfolio trackers require you to hand your financial data to a third party
 - **Universal File Import** — CSV, TSV, and PDF import with column mapping. Works with Wealthsimple, Questrade, Scotiabank, or any broker
 - **PDF Email Import** — Print broker confirmation emails to PDF, drop them in, transactions are extracted automatically
 - **Exchange-Aware Import** — Default exchange selector (TSX, NEO, NSE, etc.) auto-appends ticker suffixes on import
-- **Live Market Data** — Real-time stock prices from Yahoo Finance, configurable refresh (30s to 5min)
+- **Live Market Data** — Bounded Yahoo polling: 60s while actively viewed, 5min while idle/extended-hours, and 30min while closed
 - **Watchlist** — Track any ticker with 3M/6M/1Y performance, sortable columns, and click-to-expand historical charts
 - **Historical Charts** — Interactive area charts with 1M/3M/6M/1Y range toggles per ticker
 - **Dividend Tracking** — Projected weekly/monthly/yearly dividend income from actual payment history
@@ -86,12 +86,16 @@ services:
       - "127.0.0.1:3000:3000"
     volumes:
       - folio-data:/data
+      - ./backups:/backups
     environment:
       - NODE_ENV=production
       - HOST=0.0.0.0
       - PORT=3000
       - DB_PATH=/data/portfolio.db
       - TOKEN_PATH=/data/.auth-token
+      - BACKUP_DIR=/backups
+      - BACKUP_RETENTION_DAYS=14
+      - YAHOO_MAX_REQUESTS_PER_MINUTE=8
     restart: unless-stopped
 
 volumes:
@@ -101,8 +105,13 @@ volumes:
 Then run:
 
 ```bash
+mkdir -p backups
+# On Linux/NAS, make the bind mount writable by the container user:
+sudo chown 1001:1001 backups
 docker compose up -d
 ```
+
+If `/backups` is not writable, WhisperWealth safely falls back to `/data/backups`; `/health` reports the active path.
 
 Open [http://localhost:3000](http://localhost:3000)
 
@@ -236,6 +245,13 @@ WhisperWealth supports device biometric authentication to protect your portfolio
 | `TOKEN_PATH` | `./.auth-token` | Path to the auto-generated auth token file |
 | `CORS_ORIGINS` | localhost variants | Comma-separated allowed origins |
 | `NODE_ENV` | — | Set to `production` to serve the built frontend |
+| `BACKUP_DIR` | Beside the database | Directory for automatic database backups |
+| `BACKUP_RETENTION_DAYS` | `14` | Daily backup retention |
+| `YAHOO_MAX_REQUESTS_PER_MINUTE` | `8` | Hard provider-request ceiling; higher values are clamped to 8 |
+| `QUOTE_ACTIVE_INTERVAL_MS` | `60000` | Regular-session interval while an SSE client is active |
+| `QUOTE_IDLE_INTERVAL_MS` | `300000` | Regular-session interval while no client is active |
+| `QUOTE_EXTENDED_INTERVAL_MS` | `300000` | Pre/post-market interval |
+| `QUOTE_CLOSED_INTERVAL_MS` | `1800000` | Closed-market interval |
 
 ## Security
 
@@ -255,6 +271,7 @@ WhisperWealth supports device biometric authentication to protect your portfolio
 - Database file created with 0600 permissions (owner read/write only)
 - Docker container runs as non-root user
 - All data stays local — only outbound calls are to Yahoo Finance for market data
+- Yahoo requests are batched in groups of 50, serialized, and capped at 8 starts/minute
 - No telemetry, no analytics, no cookies
 
 ## CSV Import
@@ -272,7 +289,7 @@ A sample Wealthsimple CSV is included at `samples/wealthsimple-sample.csv`.
 
 ## Data & Backup
 
-Your entire portfolio lives in a single SQLite file (`portfolio.db`). To back up:
+Your portfolio lives in `portfolio.db`. WhisperWealth creates a backup before this schema upgrade and one atomic backup daily, retaining 14 days. Docker Compose binds them to `./backups`.
 
 ```bash
 # Local
@@ -281,6 +298,16 @@ cp portfolio.db portfolio.db.backup
 # Docker
 docker cp whisperwealth:/data/portfolio.db ./portfolio.db.backup
 ```
+
+Keep an additional copy outside the Docker volume/NAS. To restore, stop the container, replace `/data/portfolio.db` with a verified backup, preserve ownership, and restart.
+
+## Market-data behavior
+
+- Portfolio, watchlist, and FX symbols share one refresh pipeline and cache.
+- Multiple open browsers do not multiply Yahoo traffic.
+- Failed requests retain the last good value and mark it stale; missing prices are never replaced by purchase cost.
+- Yahoo data is unofficial and can be delayed or unavailable. “Live” does not mean exchange-certified real-time data.
+- `/health` reports the request budget, queue depth, refresh duration, stale count, tracked symbols, and process memory.
 
 ## Project Structure
 

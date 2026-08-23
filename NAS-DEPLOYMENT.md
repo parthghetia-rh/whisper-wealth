@@ -14,6 +14,8 @@ This guide documents the steps to deploy WhisperWealth on a NAS using Docker, in
 ssh your-nas
 mkdir -p ~/whisper-wealth
 cd ~/whisper-wealth
+mkdir -p backups
+sudo chown 1001:1001 backups
 ```
 
 ## Step 2: Create docker-compose.yml
@@ -28,13 +30,23 @@ services:
       - "3000:3000"
     volumes:
       - folio-data:/data
+      - ./backups:/backups
     environment:
       - NODE_ENV=production
       - HOST=0.0.0.0
       - PORT=3000
       - DB_PATH=/data/portfolio.db
       - TOKEN_PATH=/data/.auth-token
+      - BACKUP_DIR=/backups
+      - BACKUP_RETENTION_DAYS=14
+      - YAHOO_MAX_REQUESTS_PER_MINUTE=8
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
 
 volumes:
   folio-data:
@@ -147,9 +159,13 @@ Your data persists in the `folio-data` volume — updates don't touch it.
 
 ## Backup
 
+WhisperWealth writes daily atomic backups to `~/whisper-wealth/backups` and keeps 14 days. Copy that directory to your offline/offsite backup on the normal homelab schedule.
+
 ```bash
 docker cp whisperwealth:/data/portfolio.db ~/whisper-wealth/portfolio-backup-$(date +%Y%m%d).db
 ```
+
+Before restoring, stop the container. Copy the chosen backup over `/data/portfolio.db`, confirm ownership is UID/GID `1001`, then start the container and check `/health`.
 
 ## Troubleshooting
 

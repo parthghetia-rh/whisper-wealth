@@ -13,6 +13,7 @@ import DashboardWatchlist from '../components/DashboardWatchlist'
 const HIDDEN = '••••••'
 
 export default function Dashboard() {
+  const [marketVersion, setMarketVersion] = useState(0)
   const [showValues, setShowValues] = useState(() => {
     return localStorage.getItem('portfolio-show-values') !== 'false'
   })
@@ -34,7 +35,11 @@ export default function Dashboard() {
     refetchRates()
   }
 
-  useSSE('/api/portfolio/sse', refetchAll)
+  useSSE('/api/portfolio/sse', (event) => {
+    if (event.type !== 'market' && event.type !== 'connected') return
+    refetchAll()
+    setMarketVersion((version) => version + 1)
+  })
 
   const currencies = summary?.currencies || []
   const rates = ratesData?.rates || { USD: 1 }
@@ -88,10 +93,17 @@ export default function Dashboard() {
         <WelcomeBanner />
       )}
 
+      {summary?.unpriced_positions > 0 && (
+        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-xs text-amber-300">
+          {summary.unpriced_positions} position{summary.unpriced_positions === 1 ? '' : 's'} excluded from market value because no valid quote is available.
+        </div>
+      )}
+
       <PerformanceTracker
         displayCurrency={displayCurrency}
         showValues={showValues}
         combined={{ ...combined, yield: portfolio_yield }}
+        refreshKey={marketVersion}
       />
 
       {currencies.length > 0 && (
@@ -107,7 +119,7 @@ export default function Dashboard() {
         </Link>
       )}
 
-      <DashboardWatchlist holdings={holdings} showValues={showValues} />
+      <DashboardWatchlist holdings={holdings} showValues={showValues} refreshKey={marketVersion} />
 
       {holdings?.length > 0 && (
         <div>

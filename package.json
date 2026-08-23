@@ -6,6 +6,9 @@
   "scripts": {
     "dev": "concurrently \"nodemon server/index.js\" \"vite\"",
     "build": "vite build",
+    "test": "node --test --test-concurrency=1",
+    "smoke:provider": "node scripts/provider-smoke.js",
+    "smoke:server": "node scripts/server-smoke.js",
     "start": "NODE_ENV=production node server/index.js"
   },
   "dependencies": {

@@ -13,7 +13,7 @@ export default function TickerBar({ holdings }) {
           <span className="font-medium text-sm">{h.ticker}</span>
           <span className="text-xs text-text-muted">{h.currency}</span>
           <span className="text-sm tabular-nums">
-            {currencySymbol(h.currency)}{h.current_price.toFixed(2)}
+            {h.current_price == null ? '—' : `${currencySymbol(h.currency)}${h.current_price.toFixed(2)}`}
           </span>
           <span
             className={`text-xs tabular-nums ${h.change >= 0 ? 'text-green' : 'text-red'}`}

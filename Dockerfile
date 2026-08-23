@@ -6,7 +6,7 @@ COPY package.json package-lock.json* ./
 RUN npm ci
 
 COPY . .
-RUN npm run build
+RUN npm test && npm run build
 
 FROM node:22-alpine
 
@@ -21,7 +21,7 @@ COPY server/ ./server/
 COPY --from=build /app/dist ./dist/
 COPY public/ ./public/
 
-RUN mkdir -p /data && chown appuser:appgroup /data
+RUN mkdir -p /data /backups && chown appuser:appgroup /data /backups
 
 USER appuser
 
@@ -32,5 +32,8 @@ ENV DB_PATH=/data/portfolio.db
 ENV TOKEN_PATH=/data/.auth-token
 
 EXPOSE 3000
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+  CMD node -e "fetch('http://127.0.0.1:3000/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
 
 CMD ["node", "server/index.js"]

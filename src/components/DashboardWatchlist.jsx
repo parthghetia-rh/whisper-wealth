@@ -1,13 +1,17 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useApi } from '../hooks/useApi'
 import { currencySymbol } from '../utils/currency'
 import HoldingsTable from './HoldingsTable'
 import StockCard from './StockCard'
 
-export default function DashboardWatchlist({ holdings, showValues }) {
+export default function DashboardWatchlist({ holdings, showValues, refreshKey }) {
   const [tab, setTab] = useState('holdings')
-  const { data: watchlistData } = useApi('/api/watchlist')
+  const { data: watchlistData, refetch } = useApi('/api/watchlist')
+
+  useEffect(() => {
+    if (refreshKey) refetch()
+  }, [refreshKey, refetch])
 
   const watchlistItems = watchlistData?.items || []
 
@@ -101,7 +105,9 @@ export default function DashboardWatchlist({ holdings, showValues }) {
                               </div>
                             </Link>
                           </td>
-                          <td className="text-right p-3 tabular-nums font-medium">{sym}{q.price.toFixed(2)}</td>
+                          <td className="text-right p-3 tabular-nums font-medium">
+                            {q.price == null ? '—' : `${sym}${q.price.toFixed(2)}`}
+                          </td>
                           <td className="text-right p-3"><PctBadge value={q.change_percent} /></td>
                           <td className="text-right p-3"><PctBadge value={pc?.['3m']} /></td>
                           <td className="text-right p-3"><PctBadge value={pc?.['6m']} /></td>

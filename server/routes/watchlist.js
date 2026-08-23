@@ -1,75 +1,28 @@
 import { Router } from 'express'
 import { stmtAll, stmtGet, stmtRun } from '../db.js'
-import { getQuotes, getPeriodChanges, getChartData } from '../services/stockService.js'
+import { getChartData } from '../services/stockService.js'
+import { refreshMarketData } from '../services/marketDataService.js'
 
 const router = Router()
 const TICKER_RE = /^[A-Z0-9.\-=]{1,20}$/
 const MAX_WATCHLIST = 200
 
-const delay = (ms) => new Promise((r) => setTimeout(r, ms))
-
-let cachedQuotes = {}
-let cachedPeriodChanges = {}
-let lastFetch = 0
-let lastPeriodFetch = 0
-const PERIOD_CACHE_MS = 30 * 60 * 1000
-
-async function fetchWatchlistQuotes() {
-  const rows = stmtAll('SELECT ticker FROM watchlist')
-  if (!rows.length) return {}
-
-  const tickers = rows.map((r) => r.ticker)
-  const quotes = await getQuotes(tickers)
-  const map = {}
-  for (const q of quotes) {
-    map[q.ticker] = q
-  }
-  cachedQuotes = map
-  lastFetch = Date.now()
-
-  const alerts = stmtAll('SELECT * FROM price_alerts WHERE triggered = 0')
-  for (const alert of alerts) {
-    const q = map[alert.ticker]
-    if (!q) continue
-    const triggered =
-      (alert.condition === 'above' && q.price >= alert.target_price) ||
-      (alert.condition === 'below' && q.price <= alert.target_price)
-    if (triggered) {
-      stmtRun("UPDATE price_alerts SET triggered = 1, triggered_at = datetime('now') WHERE id = ?", [alert.id])
-      stmtRun(
-        'INSERT INTO notifications (type, title, message) VALUES (?, ?, ?)',
-        [
-          'price_alert',
-          `${alert.ticker} hit ${alert.condition === 'above' ? 'above' : 'below'} $${alert.target_price}`,
-          `${alert.ticker} is now at $${q.price.toFixed(2)} (target: ${alert.condition} $${alert.target_price})`,
-        ]
-      )
-    }
-  }
-
-  const needPeriodRefresh = Date.now() - lastPeriodFetch > PERIOD_CACHE_MS
-  if (needPeriodRefresh) {
-    for (let i = 0; i < tickers.length; i++) {
-      if (i > 0 && i % 3 === 0) await delay(2000)
-      try {
-        cachedPeriodChanges[tickers[i]] = await getPeriodChanges(tickers[i])
-      } catch {
-        cachedPeriodChanges[tickers[i]] = {}
-      }
-    }
-    lastPeriodFetch = Date.now()
-  }
-
-  return map
-}
-
 router.get('/', (req, res) => {
   const rows = stmtAll('SELECT * FROM watchlist ORDER BY sort_order ASC, id ASC')
-  const result = rows.map((r) => ({
-    ...r,
-    quote: cachedQuotes[r.ticker] || null,
-    periodChanges: cachedPeriodChanges[r.ticker] || null,
-  }))
+  const result = rows.map((row) => {
+    const quote = stmtGet('SELECT * FROM quotes WHERE ticker = ?', [row.ticker])
+    const period = stmtGet('SELECT * FROM period_changes WHERE ticker = ?', [row.ticker])
+    return {
+      ...row,
+      quote,
+      periodChanges: period ? {
+        '3m': period.change_3m,
+        '6m': period.change_6m,
+        '1y': period.change_1y,
+      } : null,
+    }
+  })
+  const lastFetch = stmtGet('SELECT MAX(last_success_at) AS value FROM quotes')?.value || null
   res.json({ items: result, lastFetch })
 })
 
@@ -93,8 +46,8 @@ router.get('/chart/:ticker', async (req, res) => {
 
 router.post('/refresh', async (req, res) => {
   try {
-    await fetchWatchlistQuotes()
-    res.json({ success: true, lastFetch })
+    const result = await refreshMarketData({ reason: 'watchlist-manual', force: true })
+    res.json(result)
   } catch (err) {
     console.error('Watchlist refresh failed:', err.message)
     res.status(500).json({ error: 'Failed to refresh watchlist' })
@@ -130,7 +83,9 @@ router.post('/', (req, res) => {
   stmtRun('INSERT INTO watchlist (ticker, list_name) VALUES (?, ?)', [sanitized, listName])
   const row = stmtGet('SELECT * FROM watchlist WHERE ticker = ?', [sanitized])
 
-  fetchWatchlistQuotes().catch(() => {})
+  refreshMarketData({ reason: 'watchlist-add', force: true }).catch((err) => {
+    console.error('Quote refresh after watchlist add failed:', err.message)
+  })
   res.status(201).json(row)
 })
 

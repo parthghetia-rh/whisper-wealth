@@ -1,11 +1,15 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useApi } from '../hooks/useApi'
 import { formatCurrency } from '../utils/currency'
 import PortfolioHistory from './PortfolioHistory'
 
-export default function PerformanceTracker({ displayCurrency, showValues, combined }) {
-  const { data } = useApi('/api/portfolio/snapshot')
+export default function PerformanceTracker({ displayCurrency, showValues, combined, refreshKey }) {
+  const { data, refetch } = useApi(`/api/portfolio/snapshot?currency=${encodeURIComponent(displayCurrency)}`)
   const [showChart, setShowChart] = useState(false)
+
+  useEffect(() => {
+    if (refreshKey) refetch()
+  }, [refreshKey, refetch])
 
   if (!combined || combined.total_value <= 0) return null
 

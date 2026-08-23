@@ -42,7 +42,7 @@ export default function MarketList({ holdings }) {
                   </div>
                 </td>
                 <td className="text-right p-2.5 tabular-nums font-medium">
-                  {sym}{h.current_price.toFixed(2)}
+                  {h.current_price == null ? '—' : `${sym}${h.current_price.toFixed(2)}`}
                 </td>
                 <td className="text-right p-2.5 tabular-nums">
                   <span className={up ? 'text-green' : 'text-red'}>

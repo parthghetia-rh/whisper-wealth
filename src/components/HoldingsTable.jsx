@@ -174,7 +174,7 @@ export default function HoldingsTable({ holdings, showValues = true }) {
                         {showValues ? `${sym}${h.avg_cost.toFixed(2)}` : HIDDEN}
                       </td>
                       <td className="text-right p-3 tabular-nums font-medium">
-                        {sym}{h.current_price.toFixed(2)}
+                        {h.current_price == null ? '—' : `${sym}${h.current_price.toFixed(2)}`}
                       </td>
                       <td className="text-right p-3 tabular-nums">
                         <span className={h.change >= 0 ? 'text-green' : 'text-red'}>
@@ -183,10 +183,12 @@ export default function HoldingsTable({ holdings, showValues = true }) {
                         </span>
                       </td>
                       <td className="text-right p-3 tabular-nums font-medium">
-                        {showValues ? `${sym}${h.market_value.toLocaleString('en-US', { minimumFractionDigits: 2 })}` : HIDDEN}
+                        {h.market_value == null
+                          ? '—'
+                          : showValues ? `${sym}${h.market_value.toLocaleString('en-US', { minimumFractionDigits: 2 })}` : HIDDEN}
                       </td>
                       <td className="text-right p-3 tabular-nums">
-                        {showValues ? (
+                        {h.gain_loss == null ? '—' : showValues ? (
                           <span className={h.gain_loss >= 0 ? 'text-green' : 'text-red'}>
                             {h.gain_loss >= 0 ? '+' : ''}{sym}
                             {Math.abs(h.gain_loss).toLocaleString('en-US', {

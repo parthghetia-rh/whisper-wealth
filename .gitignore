@@ -10,6 +10,7 @@ portfolio.db.tmp
 *.db
 *.db.tmp
 *.db.backup
+backups/
 
 # Auth token (secret)
 .auth-token

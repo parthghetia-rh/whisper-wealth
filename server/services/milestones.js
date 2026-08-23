@@ -30,16 +30,11 @@ export function checkMilestones(snapshot) {
   const newlyAchieved = []
 
   for (const t of VALUE_THRESHOLDS) {
+    if (total_value < t) break
     const id = `value_${t}`
     const m = achieve(id, 'value', `Portfolio hit ${formatValue(t)}`,
       `Your total portfolio value crossed ${formatValue(t)}!`, 'chart', total_value)
     if (m) newlyAchieved.push(m)
-  }
-
-  for (const t of VALUE_THRESHOLDS) {
-    if (total_value < t) {
-      break
-    }
   }
 
   for (const t of INCOME_THRESHOLDS) {
@@ -77,7 +72,11 @@ export function checkMilestones(snapshot) {
   }
 
   const snapshots = stmtAll(
-    'SELECT date, total_gain FROM portfolio_snapshots ORDER BY date DESC LIMIT 31'
+    `SELECT s.date,
+       SUM((s.total_value - s.total_cost) * COALESCE(r.usd_rate, 0)) AS total_gain
+     FROM portfolio_snapshots_v2 s
+     LEFT JOIN snapshot_fx_rates r ON r.date = s.date AND r.currency = s.currency
+     GROUP BY s.date ORDER BY s.date DESC LIMIT 31`
   )
   if (snapshots.length >= 2) {
     let streak = 0
@@ -100,6 +99,21 @@ export function checkMilestones(snapshot) {
 
   if (newlyAchieved.length) save()
   return newlyAchieved
+}
+
+export function getLatestSnapshotUsd() {
+  return stmtGet(`
+    SELECT s.date,
+      SUM(s.total_value * COALESCE(r.usd_rate, 0)) AS total_value,
+      SUM(s.total_cost * COALESCE(r.usd_rate, 0)) AS total_cost,
+      SUM((s.total_value - s.total_cost) * COALESCE(r.usd_rate, 0)) AS total_gain,
+      SUM(s.annual_dividends * COALESCE(r.usd_rate, 0)) AS annual_dividends,
+      SUM(s.positions) AS positions
+    FROM portfolio_snapshots_v2 s
+    LEFT JOIN snapshot_fx_rates r ON r.date = s.date AND r.currency = s.currency
+    WHERE s.date = (SELECT MAX(date) FROM portfolio_snapshots_v2)
+    GROUP BY s.date
+  `)
 }
 
 export function getUpcoming(snapshot) {

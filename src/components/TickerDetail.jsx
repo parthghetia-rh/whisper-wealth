@@ -77,14 +77,18 @@ export default function TickerDetail({ quote, item, onUpdate }) {
             </div>
             <div>
               <span className="text-text-muted">Market Value</span>
-              <div className="font-medium tabular-nums">{formatCurrency(holding.market_value, quote.currency)}</div>
+              <div className="font-medium tabular-nums">
+                {holding.market_value == null ? '—' : formatCurrency(holding.market_value, quote.currency)}
+              </div>
             </div>
             <div>
               <span className="text-text-muted">Gain/Loss</span>
-              <div className={`font-medium tabular-nums ${holding.gain_loss >= 0 ? 'text-green' : 'text-red'}`}>
-                {holding.gain_loss >= 0 ? '+' : ''}{formatCurrency(holding.gain_loss, quote.currency)}
-                <span className="text-text-muted ml-1">({holding.gain_loss_percent.toFixed(2)}%)</span>
-              </div>
+              {holding.gain_loss == null ? <div>—</div> : (
+                <div className={`font-medium tabular-nums ${holding.gain_loss >= 0 ? 'text-green' : 'text-red'}`}>
+                  {holding.gain_loss >= 0 ? '+' : ''}{formatCurrency(holding.gain_loss, quote.currency)}
+                  <span className="text-text-muted ml-1">({holding.gain_loss_percent.toFixed(2)}%)</span>
+                </div>
+              )}
             </div>
           </div>
         </div>

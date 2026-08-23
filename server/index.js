@@ -13,14 +13,29 @@ import watchlistRouter from './routes/watchlist.js'
 import settingsRouter from './routes/settings.js'
 import milestonesRouter from './routes/milestones.js'
 import expensesRouter from './routes/expenses.js'
-import { startPoller } from './services/poller.js'
+import { startPoller, stopPoller, getMarketHealth } from './services/poller.js'
+import { getDbHealth, saveNow } from './db.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const app = express()
 const PORT = process.env.PORT || 3000
 const HOST = process.env.HOST || '127.0.0.1'
 
-app.use(helmet({ contentSecurityPolicy: false }))
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", 'data:'],
+      connectSrc: ["'self'"],
+      fontSrc: ["'self'", 'data:'],
+      objectSrc: ["'none'"],
+      baseUri: ["'self'"],
+      frameAncestors: ["'none'"],
+    },
+  },
+}))
 
 const allowedOrigins = process.env.CORS_ORIGINS
   ? process.env.CORS_ORIGINS.split(',')
@@ -40,7 +55,12 @@ const importLimiter = rateLimit({ windowMs: 60_000, max: 5 })
 app.use('/api/transactions/import', express.json({ limit: '10mb' }), importLimiter)
 app.use(express.json({ limit: '100kb' }))
 
-app.get('/health', (req, res) => res.json({ status: 'ok' }))
+app.get('/health', (req, res) => {
+  const database = getDbHealth()
+  const market = getMarketHealth()
+  const status = database.last_save_error ? 'degraded' : 'ok'
+  res.status(status === 'ok' ? 200 : 503).json({ status, database, market })
+})
 
 app.use('/api', apiLimiter)
 app.use('/api', authMiddleware)
@@ -72,7 +92,7 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Internal server error' })
 })
 
-app.listen(PORT, HOST, () => {
+const server = app.listen(PORT, HOST, () => {
   console.log(`WhisperWealth running at http://${HOST}:${PORT}`)
   if (getIsFirstRun()) {
     console.log('=== FIRST RUN ===')
@@ -85,3 +105,14 @@ app.listen(PORT, HOST, () => {
   }
   startPoller()
 })
+
+function shutdown(signal) {
+  console.log(`${signal} received, shutting down cleanly`)
+  stopPoller()
+  saveNow()
+  server.close(() => process.exit(0))
+  setTimeout(() => process.exit(1), 10_000).unref()
+}
+
+process.once('SIGTERM', () => shutdown('SIGTERM'))
+process.once('SIGINT', () => shutdown('SIGINT'))

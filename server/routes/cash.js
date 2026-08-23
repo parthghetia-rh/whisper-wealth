@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { stmtAll, stmtGet, stmtRun } from '../db.js'
 import { getSettingBool } from './settings.js'
+import { updatePortfolioSnapshot } from '../services/marketDataService.js'
 
 const router = Router()
 const CURRENCY_RE = /^[A-Z]{3,5}$/
@@ -119,6 +120,7 @@ router.post('/', (req, res) => {
   )
 
   const row = stmtGet('SELECT * FROM cash_positions WHERE id = ?', [result.lastInsertRowid])
+  updatePortfolioSnapshot()
   res.status(201).json(row)
 })
 
@@ -146,6 +148,7 @@ router.put('/:id', (req, res) => {
   )
 
   const row = stmtGet('SELECT * FROM cash_positions WHERE id = ?', [id])
+  updatePortfolioSnapshot()
   res.json(row)
 })
 
@@ -159,6 +162,7 @@ router.delete('/:id', (req, res) => {
   if (result.changes === 0) {
     return res.status(404).json({ error: 'Entry not found' })
   }
+  updatePortfolioSnapshot()
   res.json({ success: true })
 })
 

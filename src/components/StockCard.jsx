@@ -6,6 +6,8 @@ export default function StockCard({ item, onClick, variant = 'holding', hasActio
   const isHolding = variant === 'holding'
   const sym = currencySymbol(item.currency || 'USD')
   const up = (item.change ?? item.change_percent ?? 0) >= 0
+  const quoteStatus = item.quote_status || item.status || 'fresh'
+  const currentPrice = item.current_price ?? item.price
   const sv = (val) => showValues ? val : HIDDEN
 
   return (
@@ -22,6 +24,13 @@ export default function StockCard({ item, onClick, variant = 'holding', hasActio
             <div className="flex items-center gap-1.5">
               <span className="text-[15px] font-semibold">{item.ticker}</span>
               <span className="text-[10px] text-text-muted">{item.currency}</span>
+              {quoteStatus !== 'fresh' && (
+                <span className={`text-[9px] px-1 py-0.5 rounded ${
+                  quoteStatus === 'stale' ? 'bg-amber-500/15 text-amber-400' : 'bg-red/15 text-red'
+                }`} title={item.last_error || 'Market price unavailable'}>
+                  {quoteStatus}
+                </span>
+              )}
             </div>
             <div className="text-[11px] text-text-muted truncate max-w-[160px]">
               {item.name}
@@ -31,7 +40,7 @@ export default function StockCard({ item, onClick, variant = 'holding', hasActio
 
         <div className="text-right shrink-0">
           <div className="text-[15px] font-semibold tabular-nums">
-            {sym}{(item.current_price ?? item.price ?? 0).toFixed(2)}
+            {currentPrice == null ? '—' : `${sym}${currentPrice.toFixed(2)}`}
           </div>
           <div className="flex items-center gap-1.5 justify-end">
             <span className={`text-[11px] tabular-nums ${up ? 'text-green' : 'text-red'}`}>
@@ -50,6 +59,13 @@ export default function StockCard({ item, onClick, variant = 'holding', hasActio
 
       {item.market_state && item.market_state !== 'REGULAR' && (
         <ExtendedHoursCompact item={item} sym={sym} />
+      )}
+
+      {(item.quote_as_of || item.last_success_at) && (
+        <div className="text-[9px] text-text-muted text-right mt-0.5">
+          Updated {formatAge(item.quote_as_of || item.last_success_at)}
+          {item.price_source && item.price_source !== 'regular' ? ` · ${item.price_source.replace('_', ' ')}` : ''}
+        </div>
       )}
 
       {variant === 'watchlist' && item.periodChanges && (
@@ -86,6 +102,13 @@ export default function StockCard({ item, onClick, variant = 'holding', hasActio
   )
 }
 
+function formatAge(value) {
+  const seconds = Math.max(0, Math.floor((Date.now() - new Date(value).getTime()) / 1000))
+  if (seconds < 60) return `${seconds}s ago`
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`
+  return `${Math.floor(seconds / 3600)}h ago`
+}
+
 export function StockCardSkeleton() {
   return (
     <div className="bg-surface-2 border border-border rounded-xl px-4 py-3 animate-pulse">
@@ -107,7 +130,7 @@ export function StockCardSkeleton() {
 }
 
 function ExtendedHoursCompact({ item, sym }) {
-  const isPre = item.market_state === 'PRE'
+  const isPre = item.market_state?.startsWith('PRE')
   const price = isPre ? item.pre_market_price : item.post_market_price
   const pct = isPre ? item.pre_market_change_percent : item.post_market_change_percent
   if (!price) return null
