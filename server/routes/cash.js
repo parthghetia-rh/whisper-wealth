@@ -1,7 +1,8 @@
 import { Router } from 'express'
-import { stmtAll, stmtGet, stmtRun } from '../db.js'
+import { stmtGet, stmtRun } from '../db.js'
 import { getSettingBool } from './settings.js'
 import { updatePortfolioSnapshot } from '../services/marketDataService.js'
+import { ownedRows, ownerFields, readOwner, readScope } from '../services/household.js'
 
 const router = Router()
 const CURRENCY_RE = /^[A-Z]{3,5}$/
@@ -50,12 +51,15 @@ function validateEntry(body) {
 }
 
 router.get('/', (req, res) => {
-  const rows = stmtAll('SELECT * FROM cash_positions ORDER BY type, currency, id')
-  res.json(rows)
+  let scope
+  try { scope = readScope(req) } catch (err) { return res.status(400).json({ error: err.message }) }
+  res.json(ownedRows('cash_positions', scope, 'type, currency, r.id'))
 })
 
 router.get('/summary', (req, res) => {
-  const rows = stmtAll('SELECT * FROM cash_positions')
+  let scope
+  try { scope = readScope(req) } catch (err) { return res.status(400).json({ error: err.message }) }
+  const rows = ownedRows('cash_positions', scope)
 
   const byCurrency = {}
   for (const r of rows) {
@@ -113,15 +117,20 @@ router.post('/', (req, res) => {
   const type = req.body.type || 'cash'
   const frequency = req.body.frequency || 'yearly'
   const interest_rate = type === 'cash' ? req.body.interest_rate : 0
+  let owner
+  try { owner = readOwner(req.body) } catch (err) { return res.status(400).json({ error: err.message }) }
 
   const result = stmtRun(
-    'INSERT INTO cash_positions (label, currency, amount, interest_rate, type, frequency) VALUES (?, ?, ?, ?, ?, ?)',
-    [req.body.label.trim(), req.body.currency.trim().toUpperCase(), req.body.amount, interest_rate, type, frequency]
+    'INSERT INTO cash_positions (label, currency, amount, interest_rate, type, frequency, member_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    [req.body.label.trim(), req.body.currency.trim().toUpperCase(), req.body.amount, interest_rate, type, frequency, owner.memberId]
   )
 
-  const row = stmtGet('SELECT * FROM cash_positions WHERE id = ?', [result.lastInsertRowid])
+  const row = stmtGet(
+    `SELECT c.*, m.name AS member_name, m.color AS member_color FROM cash_positions c
+     LEFT JOIN household_members m ON m.id = c.member_id WHERE c.id = ?`, [result.lastInsertRowid]
+  )
   updatePortfolioSnapshot()
-  res.status(201).json(row)
+  res.status(201).json({ ...row, ...ownerFields(row) })
 })
 
 router.put('/:id', (req, res) => {
@@ -141,15 +150,20 @@ router.put('/:id', (req, res) => {
   const type = req.body.type || 'cash'
   const frequency = req.body.frequency || 'yearly'
   const interest_rate = type === 'cash' ? req.body.interest_rate : 0
+  let owner
+  try { owner = readOwner(req.body, existing.member_id) } catch (err) { return res.status(400).json({ error: err.message }) }
 
   stmtRun(
-    'UPDATE cash_positions SET label = ?, currency = ?, amount = ?, interest_rate = ?, type = ?, frequency = ? WHERE id = ?',
-    [req.body.label.trim(), req.body.currency.trim().toUpperCase(), req.body.amount, interest_rate, type, frequency, id]
+    'UPDATE cash_positions SET label = ?, currency = ?, amount = ?, interest_rate = ?, type = ?, frequency = ?, member_id = ? WHERE id = ?',
+    [req.body.label.trim(), req.body.currency.trim().toUpperCase(), req.body.amount, interest_rate, type, frequency, owner.memberId, id]
   )
 
-  const row = stmtGet('SELECT * FROM cash_positions WHERE id = ?', [id])
+  const row = stmtGet(
+    `SELECT c.*, m.name AS member_name, m.color AS member_color FROM cash_positions c
+     LEFT JOIN household_members m ON m.id = c.member_id WHERE c.id = ?`, [id]
+  )
   updatePortfolioSnapshot()
-  res.json(row)
+  res.json({ ...row, ...ownerFields(row) })
 })
 
 router.delete('/:id', (req, res) => {

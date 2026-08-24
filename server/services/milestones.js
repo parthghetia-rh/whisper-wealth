@@ -12,27 +12,29 @@ function formatValue(v) {
   return `$${v}`
 }
 
-function isAchieved(id) {
-  return !!stmtGet('SELECT 1 FROM milestones WHERE id = ?', [id])
+function isAchieved(id, scopeKey) {
+  return !!stmtGet('SELECT 1 FROM milestones_v2 WHERE scope_key = ? AND id = ?', [scopeKey, id])
 }
 
-function achieve(id, category, title, description, icon, value) {
-  if (isAchieved(id)) return null
+function achieve(scopeKey, id, category, title, description, icon, value) {
+  if (isAchieved(id, scopeKey)) return null
   stmtRunBatch(
-    "INSERT OR IGNORE INTO milestones (id, category, title, description, icon, achieved_at, value) VALUES (?, ?, ?, ?, ?, datetime('now'), ?)",
-    [id, category, title, description, icon, value]
+    `INSERT OR IGNORE INTO milestones_v2
+      (scope_key, id, category, title, description, icon, achieved_at, value)
+     VALUES (?, ?, ?, ?, ?, ?, datetime('now'), ?)`,
+    [scopeKey, id, category, title, description, icon, value]
   )
-  return { id, category, title, description, icon, value }
+  return { scope_key: scopeKey, id, category, title, description, icon, value }
 }
 
-export function checkMilestones(snapshot) {
+export function checkMilestones(snapshot, scopeKey = 'household') {
   const { total_value, total_cost, total_gain, annual_dividends, positions } = snapshot
   const newlyAchieved = []
 
   for (const t of VALUE_THRESHOLDS) {
     if (total_value < t) break
     const id = `value_${t}`
-    const m = achieve(id, 'value', `Portfolio hit ${formatValue(t)}`,
+    const m = achieve(scopeKey, id, 'value', `Portfolio hit ${formatValue(t)}`,
       `Your total portfolio value crossed ${formatValue(t)}!`, 'chart', total_value)
     if (m) newlyAchieved.push(m)
   }
@@ -40,7 +42,7 @@ export function checkMilestones(snapshot) {
   for (const t of INCOME_THRESHOLDS) {
     const id = `income_${t}`
     if (annual_dividends >= t) {
-      const m = achieve(id, 'income', `${formatValue(t)}/yr income`,
+      const m = achieve(scopeKey, id, 'income', `${formatValue(t)}/yr income`,
         `Your projected annual income hit ${formatValue(t)}!`, 'dollar', annual_dividends)
       if (m) newlyAchieved.push(m)
     }
@@ -50,7 +52,7 @@ export function checkMilestones(snapshot) {
     const id = `positions_${t}`
     if (positions >= t) {
       const label = t === 1 ? 'First position' : `${t} positions`
-      const m = achieve(id, 'holdings', label,
+      const m = achieve(scopeKey, id, 'holdings', label,
         t === 1 ? 'You added your first holding!' : `You now have ${t} positions in your portfolio!`, 'grid', positions)
       if (m) newlyAchieved.push(m)
     }
@@ -62,7 +64,7 @@ export function checkMilestones(snapshot) {
       const id = `gain_${t}pct`
       if (gainPct >= t) {
         const label = t === 100 ? 'Portfolio doubled!' : `${t}% gain`
-        const m = achieve(id, 'growth', label,
+        const m = achieve(scopeKey, id, 'growth', label,
           t === 100
             ? 'Your portfolio doubled from your cost basis!'
             : `Your portfolio is up ${t}% from your cost basis!`, 'rocket', gainPct)
@@ -74,9 +76,11 @@ export function checkMilestones(snapshot) {
   const snapshots = stmtAll(
     `SELECT s.date,
        SUM((s.total_value - s.total_cost) * COALESCE(r.usd_rate, 0)) AS total_gain
-     FROM portfolio_snapshots_v2 s
+     FROM portfolio_snapshots_v3 s
      LEFT JOIN snapshot_fx_rates r ON r.date = s.date AND r.currency = s.currency
-     GROUP BY s.date ORDER BY s.date DESC LIMIT 31`
+     WHERE s.scope_key = ?
+     GROUP BY s.date ORDER BY s.date DESC LIMIT 31`,
+    [scopeKey]
   )
   if (snapshots.length >= 2) {
     let streak = 0
@@ -90,7 +94,7 @@ export function checkMilestones(snapshot) {
     for (const t of STREAK_THRESHOLDS) {
       const id = `streak_${t}`
       if (streak >= t) {
-        const m = achieve(id, 'streak', `${t}-day winning streak`,
+        const m = achieve(scopeKey, id, 'streak', `${t}-day winning streak`,
           `Your portfolio gained value ${t} days in a row!`, 'flame', streak)
         if (m) newlyAchieved.push(m)
       }
@@ -101,7 +105,7 @@ export function checkMilestones(snapshot) {
   return newlyAchieved
 }
 
-export function getLatestSnapshotUsd() {
+export function getLatestSnapshotUsd(scopeKey = 'household') {
   return stmtGet(`
     SELECT s.date,
       SUM(s.total_value * COALESCE(r.usd_rate, 0)) AS total_value,
@@ -109,11 +113,12 @@ export function getLatestSnapshotUsd() {
       SUM((s.total_value - s.total_cost) * COALESCE(r.usd_rate, 0)) AS total_gain,
       SUM(s.annual_dividends * COALESCE(r.usd_rate, 0)) AS annual_dividends,
       SUM(s.positions) AS positions
-    FROM portfolio_snapshots_v2 s
+    FROM portfolio_snapshots_v3 s
     LEFT JOIN snapshot_fx_rates r ON r.date = s.date AND r.currency = s.currency
-    WHERE s.date = (SELECT MAX(date) FROM portfolio_snapshots_v2)
+    WHERE s.scope_key = ?
+      AND s.date = (SELECT MAX(date) FROM portfolio_snapshots_v3 WHERE scope_key = ?)
     GROUP BY s.date
-  `)
+  `, [scopeKey, scopeKey])
 }
 
 export function getUpcoming(snapshot) {

@@ -1,5 +1,6 @@
 import { Router } from 'express'
-import { stmtAll, stmtGet, stmtRun } from '../db.js'
+import { stmtGet, stmtRun } from '../db.js'
+import { ownedRows, ownerFields, readOwner, readScope } from '../services/household.js'
 
 const router = Router()
 const CURRENCY_RE = /^[A-Z]{3,5}$/
@@ -37,12 +38,15 @@ function validate(body) {
 }
 
 router.get('/', (req, res) => {
-  const rows = stmtAll('SELECT * FROM expenses ORDER BY category, id')
-  res.json(rows)
+  let scope
+  try { scope = readScope(req) } catch (err) { return res.status(400).json({ error: err.message }) }
+  res.json(ownedRows('expenses', scope, 'category, r.id'))
 })
 
 router.get('/summary', (req, res) => {
-  const rows = stmtAll('SELECT * FROM expenses')
+  let scope
+  try { scope = readScope(req) } catch (err) { return res.status(400).json({ error: err.message }) }
+  const rows = ownedRows('expenses', scope)
 
   const byCurrency = {}
   const byCategory = {}
@@ -96,12 +100,17 @@ router.post('/', (req, res) => {
   if (error) return res.status(400).json({ error })
 
   const { label, category, currency, amount, frequency } = req.body
+  let owner
+  try { owner = readOwner(req.body) } catch (err) { return res.status(400).json({ error: err.message }) }
   const result = stmtRun(
-    'INSERT INTO expenses (label, category, currency, amount, frequency) VALUES (?, ?, ?, ?, ?)',
-    [label.trim(), category || 'other', (currency || 'CAD').trim().toUpperCase(), amount, frequency || 'monthly']
+    'INSERT INTO expenses (label, category, currency, amount, frequency, member_id) VALUES (?, ?, ?, ?, ?, ?)',
+    [label.trim(), category || 'other', (currency || 'CAD').trim().toUpperCase(), amount, frequency || 'monthly', owner.memberId]
   )
-  const row = stmtGet('SELECT * FROM expenses WHERE id = ?', [result.lastInsertRowid])
-  res.status(201).json(row)
+  const row = stmtGet(
+    `SELECT e.*, m.name AS member_name, m.color AS member_color FROM expenses e
+     LEFT JOIN household_members m ON m.id = e.member_id WHERE e.id = ?`, [result.lastInsertRowid]
+  )
+  res.status(201).json({ ...row, ...ownerFields(row) })
 })
 
 router.put('/:id', (req, res) => {
@@ -115,12 +124,17 @@ router.put('/:id', (req, res) => {
   if (error) return res.status(400).json({ error })
 
   const { label, category, currency, amount, frequency } = req.body
+  let owner
+  try { owner = readOwner(req.body, existing.member_id) } catch (err) { return res.status(400).json({ error: err.message }) }
   stmtRun(
-    'UPDATE expenses SET label = ?, category = ?, currency = ?, amount = ?, frequency = ? WHERE id = ?',
-    [label.trim(), category || 'other', (currency || 'CAD').trim().toUpperCase(), amount, frequency || 'monthly', id]
+    'UPDATE expenses SET label = ?, category = ?, currency = ?, amount = ?, frequency = ?, member_id = ? WHERE id = ?',
+    [label.trim(), category || 'other', (currency || 'CAD').trim().toUpperCase(), amount, frequency || 'monthly', owner.memberId, id]
   )
-  const row = stmtGet('SELECT * FROM expenses WHERE id = ?', [id])
-  res.json(row)
+  const row = stmtGet(
+    `SELECT e.*, m.name AS member_name, m.color AS member_color FROM expenses e
+     LEFT JOIN household_members m ON m.id = e.member_id WHERE e.id = ?`, [id]
+  )
+  res.json({ ...row, ...ownerFields(row) })
 })
 
 router.delete('/:id', (req, res) => {

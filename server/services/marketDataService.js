@@ -5,6 +5,7 @@ import {
   getQuotes, getDividendHistory, getPeriodChanges, getProviderMetrics,
 } from './stockService.js'
 import { checkMilestones } from './milestones.js'
+import { listSnapshotScopes, scopeWhere } from './household.js'
 
 const ACTIVE_REGULAR_INTERVAL = Number(process.env.QUOTE_ACTIVE_INTERVAL_MS) || 60_000
 const IDLE_REGULAR_INTERVAL = Number(process.env.QUOTE_IDLE_INTERVAL_MS) || 5 * 60_000
@@ -156,65 +157,89 @@ function annualDividendPerShare(ticker) {
 
 export function updatePortfolioSnapshot() {
   const date = torontoDate()
-  const byCurrency = {}
-  const holdings = {}
-  const transactions = stmtAll(
-    'SELECT ticker, type, shares, price_per_share FROM transactions ORDER BY date, id'
-  )
-  for (const item of transactions) {
-    if (!holdings[item.ticker]) holdings[item.ticker] = { shares: 0, cost: 0 }
-    const holding = holdings[item.ticker]
-    if (item.type === 'buy') {
-      holding.shares += item.shares
-      holding.cost += item.shares * item.price_per_share
-    } else {
-      const average = holding.shares > 0 ? holding.cost / holding.shares : 0
-      holding.shares -= item.shares
-      holding.cost = Math.max(0, holding.shares * average)
-    }
-  }
+  const scopeSnapshots = new Map()
 
-  for (const [ticker, holding] of Object.entries(holdings)) {
-    if (holding.shares <= 0) continue
-    const quote = stmtGet('SELECT price, currency FROM quotes WHERE ticker = ?', [ticker])
-    const currency = quote?.currency || 'USD'
-    if (!byCurrency[currency]) {
-      byCurrency[currency] = { value: 0, cost: 0, dividends: 0, positions: 0 }
+  for (const scope of listSnapshotScopes()) {
+    const byCurrency = {}
+    const ownerHoldings = {}
+    const where = scopeWhere(scope, 'member_id')
+    const transactions = stmtAll(
+      `SELECT ticker, type, shares, price_per_share, member_id FROM transactions
+       WHERE ${where.sql} ORDER BY date, id`,
+      where.params
+    )
+    for (const item of transactions) {
+      const ownerKey = item.member_id == null ? 'shared' : `member:${item.member_id}`
+      const key = `${ownerKey}:${item.ticker}`
+      if (!ownerHoldings[key]) ownerHoldings[key] = { ticker: item.ticker, shares: 0, cost: 0 }
+      const holding = ownerHoldings[key]
+      if (item.type === 'buy') {
+        holding.shares += item.shares
+        holding.cost += item.shares * item.price_per_share
+      } else {
+        const average = holding.shares > 0 ? holding.cost / holding.shares : 0
+        holding.shares -= item.shares
+        holding.cost = Math.max(0, holding.shares * average)
+      }
     }
-    if (quote?.price > 0) byCurrency[currency].value += holding.shares * quote.price
-    byCurrency[currency].cost += holding.cost
-    byCurrency[currency].dividends += holding.shares * annualDividendPerShare(ticker)
-    byCurrency[currency].positions++
-  }
 
-  for (const cash of stmtAll('SELECT * FROM cash_positions')) {
-    const currency = cash.currency || 'USD'
-    if (!byCurrency[currency]) {
-      byCurrency[currency] = { value: 0, cost: 0, dividends: 0, positions: 0 }
+    const holdings = {}
+    for (const item of Object.values(ownerHoldings).filter((holding) => holding.shares > 0)) {
+      if (!holdings[item.ticker]) holdings[item.ticker] = { shares: 0, cost: 0 }
+      holdings[item.ticker].shares += item.shares
+      holdings[item.ticker].cost += item.cost
     }
-    if ((cash.type || 'cash') === 'income') {
-      const frequency = cash.frequency || 'yearly'
-      byCurrency[currency].dividends += frequency === 'weekly'
-        ? cash.amount * 52
-        : frequency === 'monthly' ? cash.amount * 12 : cash.amount
-    } else {
-      byCurrency[currency].value += cash.amount
-      byCurrency[currency].cost += cash.amount
-      byCurrency[currency].dividends += cash.amount * ((cash.interest_rate || 0) / 100)
+    for (const [ticker, holding] of Object.entries(holdings)) {
+      const quote = stmtGet('SELECT price, currency FROM quotes WHERE ticker = ?', [ticker])
+      const currency = quote?.currency || 'USD'
+      if (!byCurrency[currency]) byCurrency[currency] = { value: 0, cost: 0, dividends: 0, positions: 0 }
+      if (quote?.price > 0) byCurrency[currency].value += holding.shares * quote.price
+      byCurrency[currency].cost += holding.cost
+      byCurrency[currency].dividends += holding.shares * annualDividendPerShare(ticker)
+      byCurrency[currency].positions++
     }
+
+    const cashWhere = scopeWhere(scope, 'member_id')
+    for (const cash of stmtAll(`SELECT * FROM cash_positions WHERE ${cashWhere.sql}`, cashWhere.params)) {
+      const currency = cash.currency || 'USD'
+      if (!byCurrency[currency]) byCurrency[currency] = { value: 0, cost: 0, dividends: 0, positions: 0 }
+      if ((cash.type || 'cash') === 'income') {
+        const frequency = cash.frequency || 'yearly'
+        byCurrency[currency].dividends += frequency === 'weekly'
+          ? cash.amount * 52
+          : frequency === 'monthly' ? cash.amount * 12 : cash.amount
+      } else {
+        byCurrency[currency].value += cash.amount
+        byCurrency[currency].cost += cash.amount
+        byCurrency[currency].dividends += cash.amount * ((cash.interest_rate || 0) / 100)
+      }
+    }
+    scopeSnapshots.set(scope.key, byCurrency)
   }
 
   const rates = getRates()
   transaction(() => {
+    const household = scopeSnapshots.get('household') || {}
     stmtRunBatch('DELETE FROM portfolio_snapshots_v2 WHERE date = ?', [date])
+    stmtRunBatch('DELETE FROM portfolio_snapshots_v3 WHERE date = ?', [date])
     stmtRunBatch('DELETE FROM snapshot_fx_rates WHERE date = ?', [date])
-    for (const [currency, values] of Object.entries(byCurrency)) {
+    for (const [currency, values] of Object.entries(household)) {
       stmtRunBatch(
         `INSERT INTO portfolio_snapshots_v2
           (date, currency, total_value, total_cost, annual_dividends, positions, updated_at)
          VALUES (?, ?, ?, ?, ?, ?, datetime('now'))`,
         [date, currency, values.value, values.cost, values.dividends, values.positions]
       )
+    }
+    for (const [scopeKey, byCurrency] of scopeSnapshots) {
+      for (const [currency, values] of Object.entries(byCurrency)) {
+        stmtRunBatch(
+          `INSERT INTO portfolio_snapshots_v3
+            (date, scope_key, currency, total_value, total_cost, annual_dividends, positions, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
+          [date, scopeKey, currency, values.value, values.cost, values.dividends, values.positions]
+        )
+      }
     }
     for (const [currency, rate] of Object.entries(rates)) {
       stmtRunBatch(
@@ -225,22 +250,24 @@ export function updatePortfolioSnapshot() {
     }
   })
 
-  const totalUsd = Object.entries(byCurrency).reduce((sum, [currency, values]) => (
-    sum + values.value * (rates[currency] || 0)
-  ), 0)
-  const costUsd = Object.entries(byCurrency).reduce((sum, [currency, values]) => (
-    sum + values.cost * (rates[currency] || 0)
-  ), 0)
-  const annualUsd = Object.entries(byCurrency).reduce((sum, [currency, values]) => (
-    sum + values.dividends * (rates[currency] || 0)
-  ), 0)
-  checkMilestones({
-    total_value: totalUsd,
-    total_cost: costUsd,
-    total_gain: totalUsd - costUsd,
-    annual_dividends: annualUsd,
-    positions: Object.values(byCurrency).reduce((sum, values) => sum + values.positions, 0),
-  })
+  for (const [scopeKey, byCurrency] of scopeSnapshots) {
+    const totalUsd = Object.entries(byCurrency).reduce((sum, [currency, values]) => (
+      sum + values.value * (rates[currency] || 0)
+    ), 0)
+    const costUsd = Object.entries(byCurrency).reduce((sum, [currency, values]) => (
+      sum + values.cost * (rates[currency] || 0)
+    ), 0)
+    const annualUsd = Object.entries(byCurrency).reduce((sum, [currency, values]) => (
+      sum + values.dividends * (rates[currency] || 0)
+    ), 0)
+    checkMilestones({
+      total_value: totalUsd,
+      total_cost: costUsd,
+      total_gain: totalUsd - costUsd,
+      annual_dividends: annualUsd,
+      positions: Object.values(byCurrency).reduce((sum, values) => sum + values.positions, 0),
+    }, scopeKey)
+  }
 }
 
 function checkPriceAlerts(quotes) {

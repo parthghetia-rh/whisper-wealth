@@ -2,9 +2,11 @@ import { useState, useEffect } from 'react'
 import { useApi } from '../hooks/useApi'
 import { formatCurrency } from '../utils/currency'
 import PortfolioHistory from './PortfolioHistory'
+import { useHousehold } from '../context/HouseholdContext'
 
 export default function PerformanceTracker({ displayCurrency, showValues, combined, refreshKey }) {
-  const { data, refetch } = useApi(`/api/portfolio/snapshot?currency=${encodeURIComponent(displayCurrency)}`)
+  const { scopedUrl } = useHousehold()
+  const { data, refetch } = useApi(scopedUrl(`/api/portfolio/snapshot?currency=${encodeURIComponent(displayCurrency)}`))
   const [showChart, setShowChart] = useState(false)
 
   useEffect(() => {

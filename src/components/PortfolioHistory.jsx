@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { AreaChart, Area, XAxis, YAxis, ResponsiveContainer, Tooltip } from 'recharts'
 import { formatCurrency } from '../utils/currency'
+import { useHousehold } from '../context/HouseholdContext'
 
 const RANGES = [
   { label: '1M', value: '1m' },
@@ -10,6 +11,7 @@ const RANGES = [
 ]
 
 export default function PortfolioHistory({ displayCurrency, mode, onClose }) {
+  const { scopedUrl } = useHousehold()
   const [range, setRange] = useState('1y')
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -17,7 +19,7 @@ export default function PortfolioHistory({ displayCurrency, mode, onClose }) {
   useEffect(() => {
     setLoading(true)
     const token = localStorage.getItem('folio-auth-token')
-    fetch(`/api/portfolio/history?range=${range}&currency=${encodeURIComponent(displayCurrency)}`, {
+    fetch(scopedUrl(`/api/portfolio/history?range=${range}&currency=${encodeURIComponent(displayCurrency)}`), {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((r) => r.json())
@@ -26,7 +28,7 @@ export default function PortfolioHistory({ displayCurrency, mode, onClose }) {
         setLoading(false)
       })
       .catch(() => setLoading(false))
-  }, [range, displayCurrency])
+  }, [range, displayCurrency, scopedUrl])
 
   const dataKey = mode === 'gain' ? 'gain' : 'value'
   const label = mode === 'gain' ? 'Gain/Loss' : 'Portfolio Value'

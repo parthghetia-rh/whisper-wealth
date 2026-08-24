@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { useApi } from '../hooks/useApi'
+import { useHousehold } from '../context/HouseholdContext'
 
 const ICONS = {
   chart: ChartIcon,
@@ -10,7 +11,8 @@ const ICONS = {
 }
 
 export function MilestoneBanner() {
-  const { data } = useApi('/api/milestones')
+  const { scopedUrl } = useHousehold()
+  const { data } = useApi(scopedUrl('/api/milestones'))
   if (!data?.latest) return null
 
   const m = data.latest
@@ -38,7 +40,8 @@ export function MilestoneBanner() {
 }
 
 export function MilestoneChips() {
-  const { data } = useApi('/api/milestones')
+  const { scopedUrl } = useHousehold()
+  const { data } = useApi(scopedUrl('/api/milestones'))
   if (!data?.achieved?.length) return null
 
   const recent = data.achieved.slice(0, 5)
@@ -68,7 +71,8 @@ export function MilestoneChips() {
 }
 
 export function UpcomingMilestones() {
-  const { data } = useApi('/api/milestones')
+  const { scopedUrl } = useHousehold()
+  const { data } = useApi(scopedUrl('/api/milestones'))
   if (!data?.upcoming?.length) return null
 
   return (

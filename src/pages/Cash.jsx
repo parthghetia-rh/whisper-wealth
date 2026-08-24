@@ -1,16 +1,19 @@
 import { useState } from 'react'
 import { useApi, postApi, putApi, deleteApi } from '../hooks/useApi'
 import { currencySymbol, formatCurrency } from '../utils/currency'
+import { useHousehold } from '../context/HouseholdContext'
+import OwnerSelect, { OwnerBadge } from '../components/OwnerSelect'
 
 export default function Cash() {
-  const { data: positions, refetch } = useApi('/api/cash')
-  const { data: summary, refetch: refetchSummary } = useApi('/api/cash/summary')
+  const { scopedUrl } = useHousehold()
+  const { data: positions, refetch } = useApi(scopedUrl('/api/cash'))
+  const { data: summary, refetch: refetchSummary } = useApi(scopedUrl('/api/cash/summary'))
 
   const [cashForm, setCashForm] = useState({
-    label: '', currency: 'CAD', amount: '', interest_rate: '',
+    label: '', currency: 'CAD', amount: '', interest_rate: '', owner_scope: '',
   })
   const [incomeForm, setIncomeForm] = useState({
-    label: '', currency: 'CAD', amount: '', frequency: 'monthly',
+    label: '', currency: 'CAD', amount: '', frequency: 'monthly', owner_scope: '',
   })
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -27,7 +30,7 @@ export default function Cash() {
         amount: Number(cashForm.amount),
         interest_rate: Number(cashForm.interest_rate),
       })
-      setCashForm({ label: '', currency: 'CAD', amount: '', interest_rate: '' })
+      setCashForm((current) => ({ label: '', currency: 'CAD', amount: '', interest_rate: '', owner_scope: current.owner_scope }))
       refetch(); refetchSummary()
     } catch (err) { setError(err.message) }
     finally { setLoading(false) }
@@ -43,7 +46,7 @@ export default function Cash() {
         amount: Number(incomeForm.amount),
         interest_rate: 0,
       })
-      setIncomeForm({ label: '', currency: 'CAD', amount: '', frequency: 'monthly' })
+      setIncomeForm((current) => ({ label: '', currency: 'CAD', amount: '', frequency: 'monthly', owner_scope: current.owner_scope }))
       refetch(); refetchSummary()
     } catch (err) { setError(err.message) }
     finally { setLoading(false) }
@@ -62,6 +65,7 @@ export default function Cash() {
       interest_rate: String(p.interest_rate || 0),
       type: p.type || 'cash',
       frequency: p.frequency || 'monthly',
+      owner_scope: p.owner_scope,
     })
   }
 
@@ -136,7 +140,8 @@ export default function Cash() {
       <div className="bg-surface-2 rounded-xl border border-border p-5">
         <h3 className="text-sm font-medium mb-4">Add Cash Position</h3>
         <form onSubmit={handleAddCash}>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-6 gap-3">
+            <OwnerSelect value={cashForm.owner_scope} onChange={(owner_scope) => setCashForm((current) => ({ ...current, owner_scope }))} includeLabel />
             <div>
               <label className="block text-xs text-text-muted mb-1">Label</label>
               <input type="text" value={cashForm.label}
@@ -175,7 +180,8 @@ export default function Cash() {
           Cashback, rent, side income, paybacks — any predictable recurring amount
         </p>
         <form onSubmit={handleAddIncome}>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-6 gap-3">
+            <OwnerSelect value={incomeForm.owner_scope} onChange={(owner_scope) => setIncomeForm((current) => ({ ...current, owner_scope }))} includeLabel />
             <div>
               <label className="block text-xs text-text-muted mb-1">Label</label>
               <input type="text" value={incomeForm.label}
@@ -219,6 +225,7 @@ export default function Cash() {
               <thead>
                 <tr className="border-b border-border text-text-muted text-xs uppercase tracking-wider">
                   <th className="text-left p-3 pl-4">Label</th>
+                  <th className="text-left p-3">Owner</th>
                   <th className="text-left p-3">Currency</th>
                   <th className="text-right p-3">Amount</th>
                   <th className="text-right p-3">Rate</th>
@@ -243,6 +250,7 @@ export default function Cash() {
               <thead>
                 <tr className="border-b border-border text-text-muted text-xs uppercase tracking-wider">
                   <th className="text-left p-3 pl-4">Label</th>
+                  <th className="text-left p-3">Owner</th>
                   <th className="text-left p-3">Currency</th>
                   <th className="text-right p-3">Amount</th>
                   <th className="text-right p-3">Frequency</th>
@@ -281,6 +289,7 @@ function renderRow(p, editingId, editForm, setEditForm, startEdit, saveEdit, han
             onKeyDown={(e) => { if (e.key === 'Enter') saveEdit(); if (e.key === 'Escape') setEditingId(null) }}
             className="w-full bg-surface-3 border border-border rounded px-2 py-1 text-sm text-text outline-none focus:border-accent" />
         </td>
+        <td className="p-2 min-w-32"><OwnerSelect value={editForm.owner_scope} onChange={(owner_scope) => setEditForm({ ...editForm, owner_scope })} /></td>
         <td className="p-2"><CurrencySelect value={editForm.currency} onChange={(v) => setEditForm({ ...editForm, currency: v })} small /></td>
         <td className="p-2"><input type="number" step="any" min="0" value={editForm.amount}
           onChange={(e) => setEditForm({ ...editForm, amount: e.target.value })}
@@ -299,6 +308,7 @@ function renderRow(p, editingId, editForm, setEditForm, startEdit, saveEdit, han
   return (
     <tr key={p.id} className="border-b border-border/50 hover:bg-surface-3/50 transition-colors">
       <td className="p-3 pl-4 font-medium">{p.label}</td>
+      <td className="p-3"><OwnerBadge name={p.owner_name} color={p.owner_color} /></td>
       <td className="p-3"><span className="bg-surface-3 px-2 py-0.5 rounded text-xs font-medium">{p.currency}</span></td>
       <td className="text-right p-3 tabular-nums">{sym}{p.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
       <td className="text-right p-3 tabular-nums">{p.interest_rate}%</td>
@@ -323,6 +333,7 @@ function renderIncomeRow(p, editingId, editForm, setEditForm, startEdit, saveEdi
             onKeyDown={(e) => { if (e.key === 'Enter') saveEdit(); if (e.key === 'Escape') setEditingId(null) }}
             className="w-full bg-surface-3 border border-border rounded px-2 py-1 text-sm text-text outline-none focus:border-accent" />
         </td>
+        <td className="p-2 min-w-32"><OwnerSelect value={editForm.owner_scope} onChange={(owner_scope) => setEditForm({ ...editForm, owner_scope })} /></td>
         <td className="p-2"><CurrencySelect value={editForm.currency} onChange={(v) => setEditForm({ ...editForm, currency: v })} small /></td>
         <td className="p-2"><input type="number" step="any" min="0" value={editForm.amount}
           onChange={(e) => setEditForm({ ...editForm, amount: e.target.value })}
@@ -345,6 +356,7 @@ function renderIncomeRow(p, editingId, editForm, setEditForm, startEdit, saveEdi
   return (
     <tr key={p.id} className="border-b border-border/50 hover:bg-surface-3/50 transition-colors">
       <td className="p-3 pl-4 font-medium">{p.label}</td>
+      <td className="p-3"><OwnerBadge name={p.owner_name} color={p.owner_color} /></td>
       <td className="p-3"><span className="bg-surface-3 px-2 py-0.5 rounded text-xs font-medium">{p.currency}</span></td>
       <td className="text-right p-3 tabular-nums">{sym}{p.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
       <td className="text-right p-3 tabular-nums capitalize">{freq}</td>

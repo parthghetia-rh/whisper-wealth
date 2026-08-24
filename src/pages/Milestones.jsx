@@ -1,5 +1,6 @@
 import { useApi } from '../hooks/useApi'
 import { UpcomingMilestones } from '../components/MilestoneCard'
+import { useHousehold } from '../context/HouseholdContext'
 
 const CATEGORY_LABELS = {
   value: 'Portfolio Value',
@@ -18,7 +19,8 @@ const CATEGORY_COLORS = {
 }
 
 export default function Milestones() {
-  const { data } = useApi('/api/milestones')
+  const { scopedUrl } = useHousehold()
+  const { data } = useApi(scopedUrl('/api/milestones'))
 
   const achieved = data?.achieved || []
   const grouped = {}

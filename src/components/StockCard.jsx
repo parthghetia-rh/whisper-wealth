@@ -68,6 +68,17 @@ export default function StockCard({ item, onClick, variant = 'holding', hasActio
         </div>
       )}
 
+      {isHolding && item.owners?.length > 0 && (
+        <div className="flex flex-wrap gap-2 mt-2">
+          {item.owners.map((owner) => (
+            <span key={owner.owner_scope} className="inline-flex items-center gap-1 text-[10px] text-text-muted">
+              <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: owner.owner_color }} />
+              {owner.owner_name}
+            </span>
+          ))}
+        </div>
+      )}
+
       {variant === 'watchlist' && item.periodChanges && (
         <div className="flex gap-3 mt-2 pt-2 border-t border-border/30">
           {['3m', '6m', '1y'].map((p) => {

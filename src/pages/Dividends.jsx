@@ -3,9 +3,11 @@ import DividendTable from '../components/DividendTable'
 import { DividendComparisonChart } from '../components/DividendChart'
 import CurrencySelector, { useDisplayCurrency } from '../components/CurrencySelector'
 import { convertAmount, formatCurrency } from '../utils/currency'
+import { useHousehold } from '../context/HouseholdContext'
 
 export default function Dividends() {
-  const { data: income } = useApi('/api/dividends/income')
+  const { scopedUrl } = useHousehold()
+  const { data: income } = useApi(scopedUrl('/api/dividends/income'))
   const { data: ratesData } = useApi('/api/portfolio/rates')
 
   const currencies = income?.currencies || []

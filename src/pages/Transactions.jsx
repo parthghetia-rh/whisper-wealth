@@ -2,9 +2,12 @@ import { useState } from 'react'
 import { useApi, deleteApi, putApi } from '../hooks/useApi'
 import TransactionForm from '../components/TransactionForm'
 import CSVImport from '../components/CSVImport'
+import { useHousehold } from '../context/HouseholdContext'
+import OwnerSelect, { OwnerBadge } from '../components/OwnerSelect'
 
 export default function Transactions() {
-  const { data: transactions, refetch } = useApi('/api/transactions')
+  const { scopedUrl } = useHousehold()
+  const { data: transactions, refetch } = useApi(scopedUrl('/api/transactions'))
   const [editingId, setEditingId] = useState(null)
   const [editForm, setEditForm] = useState(null)
   const [editError, setEditError] = useState(null)
@@ -28,6 +31,7 @@ export default function Transactions() {
       shares: String(t.shares),
       price_per_share: String(t.price_per_share),
       date: t.date,
+      owner_scope: t.owner_scope,
     })
   }
 
@@ -93,6 +97,7 @@ export default function Transactions() {
                   <th className="text-left p-3 pl-4">Date</th>
                   <th className="text-left p-3">Ticker</th>
                   <th className="text-left p-3">Type</th>
+                  <th className="text-left p-3">Owner</th>
                   <th className="text-right p-3">Shares</th>
                   <th className="text-right p-3">Price</th>
                   <th className="text-right p-3">Total</th>
@@ -160,6 +165,9 @@ export default function Transactions() {
                             Sell
                           </button>
                         </div>
+                      </td>
+                      <td className="p-2 min-w-32">
+                        <OwnerSelect value={editForm.owner_scope} onChange={(owner_scope) => setEditForm({ ...editForm, owner_scope })} />
                       </td>
                       <td className="p-2">
                         <input
@@ -235,6 +243,7 @@ export default function Transactions() {
                           {t.type.toUpperCase()}
                         </span>
                       </td>
+                      <td className="p-3"><OwnerBadge name={t.owner_name} color={t.owner_color} /></td>
                       <td className="text-right p-3 tabular-nums">{t.shares}</td>
                       <td className="text-right p-3 tabular-nums">
                         ${t.price_per_share.toFixed(2)}

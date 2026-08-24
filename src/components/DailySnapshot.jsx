@@ -1,8 +1,10 @@
 import { useApi } from '../hooks/useApi'
 import { formatCurrency } from '../utils/currency'
+import { useHousehold } from '../context/HouseholdContext'
 
 export default function DailySnapshot({ displayCurrency, showValues }) {
-  const { data } = useApi('/api/portfolio/snapshot')
+  const { scopedUrl } = useHousehold()
+  const { data } = useApi(scopedUrl(`/api/portfolio/snapshot?currency=${encodeURIComponent(displayCurrency || 'USD')}`))
 
   if (!data?.today) return null
 

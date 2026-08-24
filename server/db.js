@@ -34,7 +34,7 @@ if (existsSync(dbPath)) {
 db.run('PRAGMA foreign_keys = ON')
 
 const currentSchemaVersion = db.exec('PRAGMA user_version')[0]?.values?.[0]?.[0] || 0
-if (existsSync(dbPath) && currentSchemaVersion < 2) {
+if (existsSync(dbPath) && currentSchemaVersion < 3) {
   try {
     mkdirSync(backupDir, { recursive: true })
     const stamp = new Date().toISOString().replace(/[:.]/g, '-')
@@ -227,6 +227,56 @@ db.run(`
 `)
 
 db.run(`
+  CREATE TABLE IF NOT EXISTS household_members (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL COLLATE NOCASE UNIQUE,
+    color TEXT NOT NULL DEFAULT '#6366f1',
+    is_primary INTEGER NOT NULL DEFAULT 0,
+    archived_at TEXT,
+    created_at TEXT DEFAULT (datetime('now'))
+  )
+`)
+
+db.run(`
+  INSERT OR IGNORE INTO household_members (name, color, is_primary)
+  SELECT 'Primary', '#6366f1', 1
+  WHERE NOT EXISTS (SELECT 1 FROM household_members WHERE is_primary = 1)
+`)
+
+ensureColumn('transactions', 'member_id', 'INTEGER')
+ensureColumn('cash_positions', 'member_id', 'INTEGER')
+ensureColumn('expenses', 'member_id', 'INTEGER')
+
+const primaryMemberId = db.exec(
+  'SELECT id FROM household_members WHERE is_primary = 1 ORDER BY id LIMIT 1'
+)[0]?.values?.[0]?.[0]
+
+if (currentSchemaVersion < 3 && primaryMemberId) {
+  db.run('UPDATE transactions SET member_id = ? WHERE member_id IS NULL', [primaryMemberId])
+  db.run('UPDATE cash_positions SET member_id = ? WHERE member_id IS NULL', [primaryMemberId])
+  db.run('UPDATE expenses SET member_id = ? WHERE member_id IS NULL', [primaryMemberId])
+}
+
+db.run('CREATE INDEX IF NOT EXISTS idx_transactions_member ON transactions(member_id)')
+db.run('CREATE INDEX IF NOT EXISTS idx_cash_member ON cash_positions(member_id)')
+db.run('CREATE INDEX IF NOT EXISTS idx_expenses_member ON expenses(member_id)')
+
+db.run(`
+  CREATE TABLE IF NOT EXISTS portfolio_snapshots_v3 (
+    date TEXT NOT NULL,
+    scope_key TEXT NOT NULL,
+    currency TEXT NOT NULL,
+    total_value REAL NOT NULL DEFAULT 0,
+    total_cost REAL NOT NULL DEFAULT 0,
+    annual_dividends REAL NOT NULL DEFAULT 0,
+    positions INTEGER NOT NULL DEFAULT 0,
+    updated_at TEXT DEFAULT (datetime('now')),
+    PRIMARY KEY(date, scope_key, currency)
+  )
+`)
+
+// Keep the legacy milestone table readable while scoped milestones are seeded.
+db.run(`
   CREATE TABLE IF NOT EXISTS milestones (
     id TEXT PRIMARY KEY,
     category TEXT NOT NULL,
@@ -237,6 +287,48 @@ db.run(`
     value REAL
   )
 `)
+
+db.run(`
+  CREATE TABLE IF NOT EXISTS milestones_v2 (
+    scope_key TEXT NOT NULL,
+    id TEXT NOT NULL,
+    category TEXT NOT NULL,
+    title TEXT NOT NULL,
+    description TEXT,
+    icon TEXT,
+    achieved_at TEXT DEFAULT (datetime('now')),
+    value REAL,
+    PRIMARY KEY(scope_key, id)
+  )
+`)
+
+if (currentSchemaVersion < 3 && primaryMemberId) {
+  db.run(`
+    INSERT OR IGNORE INTO portfolio_snapshots_v3
+      (date, scope_key, currency, total_value, total_cost, annual_dividends, positions, updated_at)
+    SELECT date, 'household', currency, total_value, total_cost, annual_dividends, positions, updated_at
+    FROM portfolio_snapshots_v2
+  `)
+  db.run(`
+    INSERT OR IGNORE INTO portfolio_snapshots_v3
+      (date, scope_key, currency, total_value, total_cost, annual_dividends, positions, updated_at)
+    SELECT date, 'member:${primaryMemberId}', currency, total_value, total_cost,
+      annual_dividends, positions, updated_at
+    FROM portfolio_snapshots_v2
+  `)
+  db.run(`
+    INSERT OR IGNORE INTO milestones_v2
+      (scope_key, id, category, title, description, icon, achieved_at, value)
+    SELECT 'household', id, category, title, description, icon, achieved_at, value
+    FROM milestones
+  `)
+  db.run(`
+    INSERT OR IGNORE INTO milestones_v2
+      (scope_key, id, category, title, description, icon, achieved_at, value)
+    SELECT 'member:${primaryMemberId}', id, category, title, description, icon, achieved_at, value
+    FROM milestones
+  `)
+}
 
 db.run(`
   CREATE TABLE IF NOT EXISTS watchlist (
@@ -394,7 +486,7 @@ function getDbHealth() {
   }
 }
 
-db.run('PRAGMA user_version = 2')
+if (currentSchemaVersion < 3) db.run('PRAGMA user_version = 3')
 saveNow()
 
 export {

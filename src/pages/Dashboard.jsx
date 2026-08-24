@@ -9,10 +9,12 @@ import { convertAmount, formatCurrency } from '../utils/currency'
 import AllocationBreakdown from '../components/AllocationBreakdown'
 import PerformanceTracker from '../components/PerformanceTracker'
 import DashboardWatchlist from '../components/DashboardWatchlist'
+import { useHousehold } from '../context/HouseholdContext'
 
 const HIDDEN = '••••••'
 
 export default function Dashboard() {
+  const { scopedUrl } = useHousehold()
   const [marketVersion, setMarketVersion] = useState(0)
   const [showValues, setShowValues] = useState(() => {
     return localStorage.getItem('portfolio-show-values') !== 'false'
@@ -25,8 +27,8 @@ export default function Dashboard() {
   }
 
   const v = (val) => showValues ? val : HIDDEN
-  const { data: summary, refetch: refetchSummary } = useApi('/api/portfolio/summary')
-  const { data: holdings, refetch: refetchHoldings } = useApi('/api/portfolio')
+  const { data: summary, refetch: refetchSummary } = useApi(scopedUrl('/api/portfolio/summary'))
+  const { data: holdings, refetch: refetchHoldings } = useApi(scopedUrl('/api/portfolio'))
   const { data: ratesData, refetch: refetchRates } = useApi('/api/portfolio/rates')
 
   const refetchAll = () => {

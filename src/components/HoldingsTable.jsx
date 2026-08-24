@@ -3,6 +3,7 @@ import { currencySymbol } from '../utils/currency'
 import StockCard from './StockCard'
 import TickerChart from './TickerChart'
 import TickerDetail from './TickerDetail'
+import { OwnerBadge } from './OwnerSelect'
 
 const COLUMNS = [
   { key: 'ticker', label: 'Ticker', align: 'left' },
@@ -168,6 +169,13 @@ export default function HoldingsTable({ holdings, showValues = true }) {
                         <div className="text-xs text-text-muted truncate max-w-[140px]">
                           {h.name}
                         </div>
+                        {h.owners?.length > 0 && (
+                          <div className="flex flex-wrap gap-x-2 mt-1">
+                            {h.owners.map((owner) => (
+                              <OwnerBadge key={owner.owner_scope} name={owner.owner_name} color={owner.owner_color} />
+                            ))}
+                          </div>
+                        )}
                       </td>
                       <td className="text-right p-3 tabular-nums">{showValues ? h.shares : HIDDEN}</td>
                       <td className="text-right p-3 tabular-nums">

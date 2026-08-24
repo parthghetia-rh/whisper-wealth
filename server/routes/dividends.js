@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { stmtAll, stmtGet } from '../db.js'
 import { getSettingBool } from './settings.js'
+import { ownedRows, readScope, scopeWhere } from '../services/household.js'
 
 const router = Router()
 
@@ -28,8 +29,13 @@ router.get('/', (req, res) => {
 })
 
 router.get('/income', (req, res) => {
+  let scope
+  try { scope = readScope(req) } catch (err) { return res.status(400).json({ error: err.message }) }
+  const where = scopeWhere(scope, 'member_id')
   const transactions = stmtAll(
-    'SELECT ticker, type, shares, price_per_share, date FROM transactions ORDER BY date'
+    `SELECT ticker, type, shares, price_per_share, date FROM transactions
+     WHERE ${where.sql} ORDER BY date, id`,
+    where.params
   )
 
   const holdingsMap = {}
@@ -84,7 +90,7 @@ router.get('/income', (req, res) => {
     })
   }
 
-  const cashRows = stmtAll('SELECT * FROM cash_positions')
+  const cashRows = ownedRows('cash_positions', scope)
   for (const c of cashRows) {
     const type = c.type || 'cash'
     let annual_income
@@ -112,7 +118,7 @@ router.get('/income', (req, res) => {
     holdings: data.holdings,
   }))
 
-  res.json({ currencies })
+  res.json({ scope: scope.key, currencies })
 })
 
 export default router

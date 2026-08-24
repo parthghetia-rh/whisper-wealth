@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { postApi } from '../hooks/useApi'
+import OwnerSelect from './OwnerSelect'
 
 export default function TransactionForm({ onAdded }) {
   const [form, setForm] = useState({
@@ -8,6 +9,7 @@ export default function TransactionForm({ onAdded }) {
     shares: '',
     price_per_share: '',
     date: new Date().toISOString().split('T')[0],
+    owner_scope: '',
   })
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -23,13 +25,14 @@ export default function TransactionForm({ onAdded }) {
         shares: Number(form.shares),
         price_per_share: Number(form.price_per_share),
       })
-      setForm({
+      setForm((current) => ({
         ticker: '',
         type: 'buy',
         shares: '',
         price_per_share: '',
         date: new Date().toISOString().split('T')[0],
-      })
+        owner_scope: current.owner_scope,
+      }))
       onAdded?.()
     } catch (err) {
       setError(err.message)
@@ -49,7 +52,12 @@ export default function TransactionForm({ onAdded }) {
           {error}
         </div>
       )}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
+        <OwnerSelect
+          value={form.owner_scope}
+          onChange={(owner_scope) => setForm((current) => ({ ...current, owner_scope }))}
+          includeLabel
+        />
         <div>
           <label className="block text-xs text-text-muted mb-1">Ticker</label>
           <input

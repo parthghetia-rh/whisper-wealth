@@ -11,6 +11,7 @@ import Milestones from './pages/Milestones'
 import Expenses from './pages/Expenses'
 import Login from './pages/Login'
 import BiometricLock, { isBiometricEnabled } from './components/BiometricLock'
+import { HouseholdProvider } from './context/HouseholdContext'
 
 export default function App() {
   const [authed, setAuthed] = useState(() => !!localStorage.getItem('folio-auth-token'))
@@ -26,21 +27,23 @@ export default function App() {
 
   return (
     <BrowserRouter>
-      <Routes>
-        <Route element={<Layout onLogout={() => {
-          localStorage.removeItem('folio-auth-token')
-          setAuthed(false)
-        }} />}>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/transactions" element={<Transactions />} />
-          <Route path="/dividends" element={<Dividends />} />
-          <Route path="/cash" element={<Cash />} />
-          <Route path="/expenses" element={<Expenses />} />
-          <Route path="/watchlist" element={<Watchlist />} />
-          <Route path="/settings" element={<Settings />} />
-          <Route path="/milestones" element={<Milestones />} />
-        </Route>
-      </Routes>
+      <HouseholdProvider>
+        <Routes>
+          <Route element={<Layout onLogout={() => {
+            localStorage.removeItem('folio-auth-token')
+            setAuthed(false)
+          }} />}>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/transactions" element={<Transactions />} />
+            <Route path="/dividends" element={<Dividends />} />
+            <Route path="/cash" element={<Cash />} />
+            <Route path="/expenses" element={<Expenses />} />
+            <Route path="/watchlist" element={<Watchlist />} />
+            <Route path="/settings" element={<Settings />} />
+            <Route path="/milestones" element={<Milestones />} />
+          </Route>
+        </Routes>
+      </HouseholdProvider>
     </BrowserRouter>
   )
 }

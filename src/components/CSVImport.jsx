@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react'
 import { postApi } from '../hooks/useApi'
+import OwnerSelect from './OwnerSelect'
 
 const NONE = ''
 
@@ -22,6 +23,7 @@ export default function CSVImport({ onImported }) {
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(false)
   const [dragOver, setDragOver] = useState(false)
+  const [ownerScope, setOwnerScope] = useState('')
   const fileRef = useRef(null)
 
   const reset = () => {
@@ -178,13 +180,14 @@ export default function CSVImport({ onImported }) {
           sharesCol: 'Quantity',
           priceCol: 'Price',
         }
-        const data = await postApi('/api/transactions/import', { csv, mapping })
+        const data = await postApi('/api/transactions/import', { csv, mapping, owner_scope: ownerScope })
         setResult(data)
       } else {
         const fullMapping = { ...mapping, mode }
         const data = await postApi('/api/transactions/import', {
           csv: csvText,
           mapping: fullMapping,
+          owner_scope: ownerScope,
         })
         setResult(data)
       }
@@ -235,6 +238,8 @@ export default function CSVImport({ onImported }) {
       {error && (
         <div className="text-red text-xs bg-red/10 rounded-lg px-3 py-2">{error}</div>
       )}
+
+      <OwnerSelect value={ownerScope} onChange={setOwnerScope} includeLabel className="max-w-xs" />
 
       {loading && (
         <div className="border-2 border-dashed border-accent/50 rounded-lg px-6 py-10 text-center bg-accent/5">

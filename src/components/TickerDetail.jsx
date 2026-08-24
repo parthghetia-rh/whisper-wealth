@@ -1,15 +1,17 @@
 import { useState } from 'react'
 import { useApi, postApi, putApi } from '../hooks/useApi'
 import { currencySymbol, formatCurrency } from '../utils/currency'
+import { useHousehold } from '../context/HouseholdContext'
 
 export default function TickerDetail({ quote, item, onUpdate }) {
+  const { scopedUrl } = useHousehold()
   const [note, setNote] = useState(item?.note || '')
   const [noteSaving, setNoteSaving] = useState(false)
   const [alertPrice, setAlertPrice] = useState('')
   const [alertCondition, setAlertCondition] = useState('below')
 
-  const { data: holdings } = useApi('/api/portfolio')
-  const { data: transactions } = useApi('/api/transactions')
+  const { data: holdings } = useApi(scopedUrl('/api/portfolio'))
+  const { data: transactions } = useApi(scopedUrl('/api/transactions'))
 
   if (!quote) return null
 

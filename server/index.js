@@ -13,6 +13,7 @@ import watchlistRouter from './routes/watchlist.js'
 import settingsRouter from './routes/settings.js'
 import milestonesRouter from './routes/milestones.js'
 import expensesRouter from './routes/expenses.js'
+import householdRouter from './routes/household.js'
 import { startPoller, stopPoller, getMarketHealth } from './services/poller.js'
 import { getDbHealth, saveNow } from './db.js'
 
@@ -74,6 +75,7 @@ app.use('/api/watchlist', watchlistRouter)
 app.use('/api/settings', settingsRouter)
 app.use('/api/milestones', milestonesRouter)
 app.use('/api/expenses', expensesRouter)
+app.use('/api/household', householdRouter)
 
 app.all('/api/*', (req, res) => {
   res.status(404).json({ error: 'Not found' })

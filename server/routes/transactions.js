@@ -1,8 +1,10 @@
 import { Router } from 'express'
-import { stmtAll, stmtGet, stmtRun, stmtRunBatch, save } from '../db.js'
+import { stmtGet, stmtRun, stmtRunBatch, save } from '../db.js'
 import { triggerPoll } from '../services/poller.js'
 import { parseHeaders, importWithMapping } from '../services/csvParser.js'
 import { parsePDF } from '../services/pdfParser.js'
+import { ownedRows, ownerFields, readOwner, readScope } from '../services/household.js'
+import { updatePortfolioSnapshot } from '../services/marketDataService.js'
 
 const router = Router()
 const TICKER_RE = /^[A-Z0-9.\-]{1,20}$/
@@ -38,7 +40,9 @@ function validateTransaction(body) {
 }
 
 router.get('/', (req, res) => {
-  const rows = stmtAll('SELECT * FROM transactions ORDER BY date DESC, id DESC')
+  let scope
+  try { scope = readScope(req) } catch (err) { return res.status(400).json({ error: err.message }) }
+  const rows = ownedRows('transactions', scope, 'date DESC, r.id DESC')
   res.json(rows.map((r) => ({ ...r, shares: Math.round(r.shares * 10000) / 10000 })))
 })
 
@@ -47,27 +51,32 @@ router.post('/', (req, res) => {
   if (error) return res.status(400).json({ error })
 
   const sanitizedTicker = req.body.ticker.trim().toUpperCase()
+  let owner
+  try { owner = readOwner(req.body) } catch (err) { return res.status(400).json({ error: err.message }) }
 
   const result = stmtRun(
-    'INSERT INTO transactions (ticker, type, shares, price_per_share, date) VALUES (?, ?, ?, ?, ?)',
-    [sanitizedTicker, req.body.type, req.body.shares, req.body.price_per_share, req.body.date]
+    'INSERT INTO transactions (ticker, type, shares, price_per_share, date, member_id) VALUES (?, ?, ?, ?, ?, ?)',
+    [sanitizedTicker, req.body.type, req.body.shares, req.body.price_per_share, req.body.date, owner.memberId]
   )
 
-  const row = stmtGet('SELECT * FROM transactions WHERE id = ?', [
-    result.lastInsertRowid,
-  ])
+  const row = stmtGet(
+    `SELECT t.*, m.name AS member_name, m.color AS member_color
+     FROM transactions t LEFT JOIN household_members m ON m.id = t.member_id WHERE t.id = ?`,
+    [result.lastInsertRowid]
+  )
 
   const existingQuote = stmtGet('SELECT 1 FROM quotes WHERE ticker = ?', [sanitizedTicker])
   if (!existingQuote) {
     refreshAfterChange()
   }
+  updatePortfolioSnapshot()
 
   const inWatchlist = stmtGet('SELECT 1 FROM watchlist WHERE ticker = ?', [sanitizedTicker])
   if (!inWatchlist) {
     try { stmtRun('INSERT INTO watchlist (ticker) VALUES (?)', [sanitizedTicker]) } catch {}
   }
 
-  res.status(201).json(row)
+  res.status(201).json({ ...row, ...ownerFields(row) })
 })
 
 router.put('/:id', (req, res) => {
@@ -85,20 +94,26 @@ router.put('/:id', (req, res) => {
   if (error) return res.status(400).json({ error })
 
   const sanitizedTicker = req.body.ticker.trim().toUpperCase()
+  let owner
+  try { owner = readOwner(req.body, existing.member_id) } catch (err) { return res.status(400).json({ error: err.message }) }
 
   stmtRun(
-    'UPDATE transactions SET ticker = ?, type = ?, shares = ?, price_per_share = ?, date = ? WHERE id = ?',
-    [sanitizedTicker, req.body.type, req.body.shares, req.body.price_per_share, req.body.date, id]
+    'UPDATE transactions SET ticker = ?, type = ?, shares = ?, price_per_share = ?, date = ?, member_id = ? WHERE id = ?',
+    [sanitizedTicker, req.body.type, req.body.shares, req.body.price_per_share, req.body.date, owner.memberId, id]
   )
 
-  const row = stmtGet('SELECT * FROM transactions WHERE id = ?', [id])
+  const row = stmtGet(
+    `SELECT t.*, m.name AS member_name, m.color AS member_color
+     FROM transactions t LEFT JOIN household_members m ON m.id = t.member_id WHERE t.id = ?`, [id]
+  )
 
   if (sanitizedTicker !== existing.ticker) {
     const hasQuote = stmtGet('SELECT 1 FROM quotes WHERE ticker = ?', [sanitizedTicker])
     if (!hasQuote) refreshAfterChange()
   }
+  updatePortfolioSnapshot()
 
-  res.json(row)
+  res.json({ ...row, ...ownerFields(row) })
 })
 
 router.delete('/:id', (req, res) => {
@@ -111,6 +126,7 @@ router.delete('/:id', (req, res) => {
   if (result.changes === 0) {
     return res.status(404).json({ error: 'Transaction not found' })
   }
+  updatePortfolioSnapshot()
   res.json({ success: true })
 })
 
@@ -188,12 +204,14 @@ router.post('/import', (req, res) => {
   if (result.transactions.length > 500) {
     return res.status(400).json({ error: 'Too many rows — max 500 per import' })
   }
+  let owner
+  try { owner = readOwner(req.body) } catch (err) { return res.status(400).json({ error: err.message }) }
 
   let imported = 0
   for (const t of result.transactions) {
     stmtRunBatch(
-      'INSERT INTO transactions (ticker, type, shares, price_per_share, date) VALUES (?, ?, ?, ?, ?)',
-      [t.ticker, t.type, t.shares, t.price_per_share, t.date]
+      'INSERT INTO transactions (ticker, type, shares, price_per_share, date, member_id) VALUES (?, ?, ?, ?, ?, ?)',
+      [t.ticker, t.type, t.shares, t.price_per_share, t.date, owner.memberId]
     )
     const inWatchlist = stmtGet('SELECT 1 FROM watchlist WHERE ticker = ?', [t.ticker])
     if (!inWatchlist) {
@@ -202,9 +220,10 @@ router.post('/import', (req, res) => {
     imported++
   }
   save()
+  updatePortfolioSnapshot()
   refreshAfterChange()
 
-  res.json({ imported, skipped: result.skipped.length, skippedDetails: result.skipped })
+  res.json({ imported, skipped: result.skipped.length, skippedDetails: result.skipped, owner_scope: owner.key })
 })
 
 export default router

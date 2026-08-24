@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { themes, getStoredTheme, applyTheme } from '../utils/themes'
 import NotificationBell from './NotificationBell'
+import { useHousehold } from '../context/HouseholdContext'
 
 const DEFAULT_NAV = [
   { to: '/', label: 'Dashboard', icon: 'dashboard', short: 'Home' },
@@ -47,6 +48,7 @@ function getOrderedNav() {
 }
 
 export default function Layout({ onLogout }) {
+  const { scope, setScope, members } = useHousehold()
   const [currentTheme, setCurrentTheme] = useState(getStoredTheme)
   const [themeOpen, setThemeOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
@@ -341,6 +343,19 @@ export default function Layout({ onLogout }) {
               </svg>
             </NavLink>
           </div>
+        </div>
+
+        <div className="flex items-center justify-between gap-3 px-4 md:px-6 py-2 bg-surface-2/60 border-b border-border">
+          <span className="text-[10px] uppercase tracking-wider text-text-muted">Portfolio view</span>
+          <select
+            value={scope}
+            onChange={(event) => setScope(event.target.value)}
+            className="max-w-52 bg-surface-3 border border-border rounded-lg px-3 py-1.5 text-xs text-text outline-none focus:border-accent"
+          >
+            <option value="household">Combined</option>
+            <option value="shared">Shared</option>
+            {members.map((member) => <option key={member.id} value={member.scope}>{member.name}</option>)}
+          </select>
         </div>
 
         <main className="flex-1 overflow-auto p-4 md:p-6 pb-20 md:pb-6">

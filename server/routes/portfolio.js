@@ -5,20 +5,27 @@ import {
 } from '../services/poller.js'
 import { torontoDate } from '../services/marketDataService.js'
 import { getSettingBool } from './settings.js'
+import { ownedRows, ownerFields, readScope, scopeWhere } from '../services/household.js'
 
 const router = Router()
 
-function getHoldings() {
+function getHoldings(scope) {
+  const where = scopeWhere(scope, 't.member_id')
   const transactions = stmtAll(
-    'SELECT ticker, type, shares, price_per_share FROM transactions'
+    `SELECT t.*, m.name AS member_name, m.color AS member_color
+     FROM transactions t LEFT JOIN household_members m ON m.id = t.member_id
+     WHERE ${where.sql} ORDER BY t.date, t.id`,
+    where.params
   )
 
-  const holdingsMap = {}
+  const ownerHoldings = {}
   for (const t of transactions) {
-    if (!holdingsMap[t.ticker]) {
-      holdingsMap[t.ticker] = { ticker: t.ticker, shares: 0, total_cost: 0 }
+    const owner = ownerFields(t)
+    const key = `${owner.owner_scope}:${t.ticker}`
+    if (!ownerHoldings[key]) {
+      ownerHoldings[key] = { ticker: t.ticker, shares: 0, total_cost: 0, ...owner }
     }
-    const h = holdingsMap[t.ticker]
+    const h = ownerHoldings[key]
     if (t.type === 'buy') {
       h.total_cost += t.shares * t.price_per_share
       h.shares += t.shares
@@ -29,7 +36,22 @@ function getHoldings() {
     }
   }
 
-  return Object.values(holdingsMap).filter((h) => h.shares > 0)
+  const combined = {}
+  for (const holding of Object.values(ownerHoldings).filter((h) => h.shares > 0)) {
+    if (!combined[holding.ticker]) {
+      combined[holding.ticker] = { ticker: holding.ticker, shares: 0, total_cost: 0, owners: [] }
+    }
+    combined[holding.ticker].shares += holding.shares
+    combined[holding.ticker].total_cost += holding.total_cost
+    combined[holding.ticker].owners.push({
+      owner_scope: holding.owner_scope,
+      owner_name: holding.owner_name,
+      owner_color: holding.owner_color,
+      shares: Math.round(holding.shares * 10000) / 10000,
+      total_cost: Math.round(holding.total_cost * 100) / 100,
+    })
+  }
+  return Object.values(combined)
 }
 
 function getAnnualDividendPerShare(ticker) {
@@ -46,7 +68,9 @@ function getAnnualDividendPerShare(ticker) {
 }
 
 router.get('/', (req, res) => {
-  const holdings = getHoldings()
+  let scope
+  try { scope = readScope(req) } catch (err) { return res.status(400).json({ error: err.message }) }
+  const holdings = getHoldings(scope)
 
   const result = holdings.map((h) => {
     const quote = stmtGet('SELECT * FROM quotes WHERE ticker = ?', [h.ticker])
@@ -84,6 +108,7 @@ router.get('/', (req, res) => {
       pre_market_price: quote?.pre_market_price ?? null,
       post_market_price: quote?.post_market_price ?? null,
       last_error: quote?.last_error || null,
+      owners: scope.type === 'household' ? h.owners : undefined,
     }
   })
 
@@ -91,7 +116,9 @@ router.get('/', (req, res) => {
 })
 
 router.get('/summary', (req, res) => {
-  const holdings = getHoldings()
+  let scope
+  try { scope = readScope(req) } catch (err) { return res.status(400).json({ error: err.message }) }
+  const holdings = getHoldings(scope)
   let unpricedPositions = 0
 
   const byCurrency = {}
@@ -120,7 +147,7 @@ router.get('/summary', (req, res) => {
     byCurrency[currency].positions += 1
   }
 
-  const cashRows = stmtAll('SELECT * FROM cash_positions')
+  const cashRows = ownedRows('cash_positions', scope)
   for (const c of cashRows) {
     const type = c.type || 'cash'
     let annual_income
@@ -174,7 +201,7 @@ router.get('/summary', (req, res) => {
     }
   })
 
-  res.json({ currencies, unpriced_positions: unpricedPositions })
+  res.json({ scope: scope.key, currencies, unpriced_positions: unpricedPositions })
 })
 
 function requestedCurrency(req) {
@@ -188,9 +215,12 @@ function convert(amount, from, to, rates) {
   return (amount * rates[from]) / rates[to]
 }
 
-function convertedSnapshot(date, currency) {
+function convertedSnapshot(date, currency, scopeKey) {
   if (!date) return null
-  const rows = stmtAll('SELECT * FROM portfolio_snapshots_v2 WHERE date = ?', [date])
+  const rows = stmtAll(
+    'SELECT * FROM portfolio_snapshots_v3 WHERE date = ? AND scope_key = ?',
+    [date, scopeKey]
+  )
   if (!rows.length) return null
   const rates = { USD: 1 }
   for (const row of stmtAll('SELECT currency, usd_rate FROM snapshot_fx_rates WHERE date = ?', [date])) {
@@ -208,10 +238,11 @@ function convertedSnapshot(date, currency) {
   return { ...result, date, total_gain: result.total_value - result.total_cost }
 }
 
-function snapshotDateAtOrBefore(date) {
+function snapshotDateAtOrBefore(date, scopeKey) {
   return stmtGet(
-    'SELECT DISTINCT date FROM portfolio_snapshots_v2 WHERE date <= ? ORDER BY date DESC LIMIT 1',
-    [date]
+    `SELECT DISTINCT date FROM portfolio_snapshots_v3
+     WHERE date <= ? AND scope_key = ? ORDER BY date DESC LIMIT 1`,
+    [date, scopeKey]
   )?.date || null
 }
 
@@ -225,18 +256,20 @@ function calcChange(current, reference) {
 }
 
 router.get('/snapshot', (req, res) => {
+  let scope
+  try { scope = readScope(req) } catch (err) { return res.status(400).json({ error: err.message }) }
   const currency = requestedCurrency(req)
   const today = torontoDate()
   const yesterday = torontoDate(new Date(Date.now() - 86400000))
   const weekAgo = torontoDate(new Date(Date.now() - 7 * 86400000))
   const monthAgo = torontoDate(new Date(Date.now() - 30 * 86400000))
-  const todaySnap = convertedSnapshot(snapshotDateAtOrBefore(today), currency)
-  const yesterdaySnap = convertedSnapshot(snapshotDateAtOrBefore(yesterday), currency)
-  const weekSnap = convertedSnapshot(snapshotDateAtOrBefore(weekAgo), currency)
-  const monthSnap = convertedSnapshot(snapshotDateAtOrBefore(monthAgo), currency)
+  const todaySnap = convertedSnapshot(snapshotDateAtOrBefore(today, scope.key), currency, scope.key)
+  const yesterdaySnap = convertedSnapshot(snapshotDateAtOrBefore(yesterday, scope.key), currency, scope.key)
+  const weekSnap = convertedSnapshot(snapshotDateAtOrBefore(weekAgo, scope.key), currency, scope.key)
+  const monthSnap = convertedSnapshot(snapshotDateAtOrBefore(monthAgo, scope.key), currency, scope.key)
   const rates = getRates()
 
-  const holdings = getHoldings()
+  const holdings = getHoldings(scope)
   let topMover = null
   let worstMover = null
   let dayGain = 0
@@ -258,6 +291,7 @@ router.get('/snapshot', (req, res) => {
   const dayGainPct = totalValue > 0 ? Math.round((dayGain / (totalValue - dayGain)) * 10000) / 100 : 0
 
   res.json({
+    scope: scope.key,
     currency,
     as_of: stmtGet('SELECT MAX(last_success_at) AS value FROM quotes')?.value || null,
     today: todaySnap,
@@ -280,6 +314,8 @@ router.get('/snapshot', (req, res) => {
 })
 
 router.get('/history', (req, res) => {
+  let scope
+  try { scope = readScope(req) } catch (err) { return res.status(400).json({ error: err.message }) }
   const currency = requestedCurrency(req)
   const range = ['1m', '3m', '6m', '1y'].includes(req.query.range) ? req.query.range : '1y'
   const months = { '1m': 1, '3m': 3, '6m': 6, '1y': 12 }[range] || 12
@@ -288,16 +324,17 @@ router.get('/history', (req, res) => {
   const cutoffStr = torontoDate(cutoff)
 
   const dates = stmtAll(
-    'SELECT DISTINCT date FROM portfolio_snapshots_v2 WHERE date >= ? ORDER BY date ASC',
-    [cutoffStr]
+    `SELECT DISTINCT date FROM portfolio_snapshots_v3
+     WHERE date >= ? AND scope_key = ? ORDER BY date ASC`,
+    [cutoffStr, scope.key]
   )
 
   if (!dates.length) {
-    return res.json({ data: [], range, currency, legacy_archived: true })
+    return res.json({ data: [], range, currency, scope: scope.key, legacy_archived: true })
   }
 
   try {
-    const data = dates.map(({ date }) => convertedSnapshot(date, currency))
+    const data = dates.map(({ date }) => convertedSnapshot(date, currency, scope.key))
       .filter(Boolean)
       .map((snapshot) => ({
         date: snapshot.date,
@@ -306,7 +343,7 @@ router.get('/history', (req, res) => {
         gain: Math.round(snapshot.total_gain * 100) / 100,
       }))
 
-    res.json({ data, range, currency, legacy_archived: true })
+    res.json({ data, range, currency, scope: scope.key, legacy_archived: true })
   } catch (err) {
     console.error('Portfolio history failed:', err.message)
     res.status(500).json({ error: 'Failed to load portfolio history' })

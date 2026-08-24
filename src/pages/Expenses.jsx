@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { useApi, postApi, putApi, deleteApi } from '../hooks/useApi'
 import { currencySymbol, formatCurrency } from '../utils/currency'
+import { useHousehold } from '../context/HouseholdContext'
+import OwnerSelect, { OwnerBadge } from '../components/OwnerSelect'
 
 const CATEGORIES = [
   { id: 'housing', label: 'Housing' },
@@ -24,11 +26,12 @@ const CATEGORY_COLORS = {
 }
 
 export default function Expenses() {
-  const { data: expenses, refetch } = useApi('/api/expenses')
-  const { data: summary, refetch: refetchSummary } = useApi('/api/expenses/summary')
+  const { scopedUrl } = useHousehold()
+  const { data: expenses, refetch } = useApi(scopedUrl('/api/expenses'))
+  const { data: summary, refetch: refetchSummary } = useApi(scopedUrl('/api/expenses/summary'))
 
   const [form, setForm] = useState({
-    label: '', category: 'other', currency: 'CAD', amount: '', frequency: 'monthly',
+    label: '', category: 'other', currency: 'CAD', amount: '', frequency: 'monthly', owner_scope: '',
   })
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -41,7 +44,7 @@ export default function Expenses() {
     setLoading(true)
     try {
       await postApi('/api/expenses', { ...form, amount: Number(form.amount) })
-      setForm({ label: '', category: 'other', currency: 'CAD', amount: '', frequency: 'monthly' })
+      setForm((current) => ({ label: '', category: 'other', currency: 'CAD', amount: '', frequency: 'monthly', owner_scope: current.owner_scope }))
       refetch(); refetchSummary()
     } catch (err) { setError(err.message) }
     finally { setLoading(false) }
@@ -57,6 +60,7 @@ export default function Expenses() {
     setEditForm({
       label: e.label, category: e.category, currency: e.currency,
       amount: String(e.amount), frequency: e.frequency,
+      owner_scope: e.owner_scope,
     })
   }
 
@@ -178,7 +182,8 @@ export default function Expenses() {
       <div className="bg-surface-2 rounded-xl border border-border p-5">
         <h3 className="text-sm font-medium mb-4">Add Expense</h3>
         <form onSubmit={handleAdd}>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-6 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-7 gap-3">
+            <OwnerSelect value={form.owner_scope} onChange={(owner_scope) => setForm((current) => ({ ...current, owner_scope }))} includeLabel />
             <div>
               <label className="block text-xs text-text-muted mb-1">Label</label>
               <input type="text" value={form.label}
@@ -239,6 +244,7 @@ export default function Expenses() {
                 <tr className="border-b border-border text-text-muted text-xs uppercase tracking-wider">
                   {[
                     { key: 'label', label: 'Expense', align: 'left', pl: true },
+                    { key: 'owner_name', label: 'Owner', align: 'left' },
                     { key: 'category', label: 'Category', align: 'left' },
                     { key: 'currency', label: 'Currency', align: 'left' },
                     { key: 'amount', label: 'Amount', align: 'right' },
@@ -280,6 +286,9 @@ export default function Expenses() {
                             onChange={(ev) => setEditForm({ ...editForm, label: ev.target.value })}
                             onKeyDown={(ev) => { if (ev.key === 'Enter') saveEdit(); if (ev.key === 'Escape') setEditingId(null) }}
                             className="w-full bg-surface-3 border border-border rounded px-2 py-1 text-sm text-text outline-none focus:border-accent" />
+                        </td>
+                        <td className="p-2 min-w-32">
+                          <OwnerSelect value={editForm.owner_scope} onChange={(owner_scope) => setEditForm({ ...editForm, owner_scope })} />
                         </td>
                         <td className="p-2">
                           <select value={editForm.category} onChange={(ev) => setEditForm({ ...editForm, category: ev.target.value })}
@@ -325,6 +334,7 @@ export default function Expenses() {
                   return (
                     <tr key={e.id} className="border-b border-border/50 hover:bg-surface-3/50 transition-colors">
                       <td className="p-3 pl-4 font-medium">{e.label}</td>
+                      <td className="p-3"><OwnerBadge name={e.owner_name} color={e.owner_color} /></td>
                       <td className="p-3">
                         <span className="inline-flex items-center gap-1.5 text-xs">
                           <span className="w-2 h-2 rounded-full" style={{ backgroundColor: CATEGORY_COLORS[e.category] }} />
