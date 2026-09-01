@@ -326,24 +326,82 @@ export default function Layout({ onLogout }) {
       {/* Main content */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Mobile top bar */}
-        <div className="md:hidden flex items-center justify-between gap-3 px-4 py-2.5 bg-surface-2 border-b border-border">
+        <div className="relative z-50 flex items-center justify-between gap-3 border-b border-border bg-surface-2 px-4 py-2.5 md:hidden">
           <NavLink to="/" className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
             <Logo size={24} />
             <span className="truncate text-sm font-semibold text-text">WhisperWealth</span>
           </NavLink>
-          <div className="ml-auto flex shrink-0 items-center gap-2.5">
+          <div className="ml-auto flex shrink-0 items-center gap-2">
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg hover:bg-surface-3">
               <NotificationBell />
+            </div>
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setThemeOpen((open) => !open)}
+                aria-label="Choose theme"
+                aria-expanded={themeOpen}
+                aria-controls="mobile-theme-menu"
+                className={`relative flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors ${
+                  themeOpen
+                    ? 'bg-accent/15 text-accent-hover'
+                    : 'text-text-muted hover:bg-surface-3 hover:text-text'
+                }`}
+              >
+                <ThemeIcon />
+                <span
+                  className="absolute bottom-1 right-1 h-2.5 w-2.5 rounded-full border-2 border-surface-2"
+                  style={{ backgroundColor: themes[currentTheme]?.swatch }}
+                />
+              </button>
+              {themeOpen && (
+                <div
+                  id="mobile-theme-menu"
+                  className="absolute right-0 top-full z-[110] mt-2 w-64 rounded-xl border border-border bg-surface-2 p-2 shadow-xl"
+                >
+                  <p className="px-2 pb-1.5 text-[10px] font-medium uppercase tracking-wider text-text-muted">
+                    Choose theme
+                  </p>
+                  <div className="grid grid-cols-2 gap-1">
+                    {Object.entries(themes).map(([id, theme]) => (
+                      <button
+                        type="button"
+                        key={id}
+                        onClick={() => {
+                          setCurrentTheme(id)
+                          setThemeOpen(false)
+                        }}
+                        aria-pressed={currentTheme === id}
+                        className={`flex items-center gap-2 rounded-lg px-2 py-2 text-left text-xs transition-colors ${
+                          currentTheme === id
+                            ? 'bg-accent/15 font-medium text-accent-hover'
+                            : 'text-text-muted hover:bg-surface-3 hover:text-text'
+                        }`}
+                      >
+                        <span
+                          className="h-3.5 w-3.5 shrink-0 rounded-full border border-border"
+                          style={{ backgroundColor: theme.swatch }}
+                        />
+                        <span className="truncate">{theme.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
             <NavLink
               to="/settings"
               aria-label="Settings"
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-text-muted hover:bg-surface-3 hover:text-text"
+              title="Settings"
+              className={({ isActive }) =>
+                `flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors ${
+                  isActive
+                    ? 'bg-accent/15 text-accent-hover'
+                    : 'text-text-muted hover:bg-surface-3 hover:text-text'
+                }`
+              }
             >
-              <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="9" cy="9" r="2.5" />
-                <path d="M9 1.5v2M9 14.5v2M1.5 9h2M14.5 9h2M3.4 3.4l1.4 1.4M13.2 13.2l1.4 1.4M3.4 14.6l1.4-1.4M13.2 4.8l1.4-1.4" />
-              </svg>
+              <SettingsIcon size={20} />
             </NavLink>
           </div>
         </div>
@@ -444,11 +502,23 @@ function WatchlistIcon() {
   )
 }
 
-function SettingsIcon() {
+function SettingsIcon({ size = 16 }) {
   return (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="8" cy="8" r="2" />
-      <path d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2M3.3 3.3l1.4 1.4M11.3 11.3l1.4 1.4M3.3 12.7l1.4-1.4M11.3 4.7l1.4-1.4" />
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z" />
+      <path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 .6 1.7 1.7 0 0 0-.4 1.1V21a2 2 0 1 1-4 0v-.09A1.7 1.7 0 0 0 8.5 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-.6-1 1.7 1.7 0 0 0-1.1-.4H3a2 2 0 1 1 0-4h.09A1.7 1.7 0 0 0 4.6 8.5a1.7 1.7 0 0 0-.34-1.88l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-.6 1.7 1.7 0 0 0 .4-1.1V3a2 2 0 1 1 4 0v.09A1.7 1.7 0 0 0 15.5 4.6a1.7 1.7 0 0 0 1.88-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.7 1.7 0 0 0 19.4 9c.1.37.31.72.6 1 .3.26.68.4 1.1.4H21a2 2 0 1 1 0 4h-.09A1.7 1.7 0 0 0 19.4 15Z" />
+    </svg>
+  )
+}
+
+function ThemeIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12 3a9 9 0 0 0 0 18h1.5a1.5 1.5 0 0 0 0-3H12a2 2 0 0 1 0-4h5a4 4 0 0 0 4-4c0-3.87-4.03-7-9-7Z" />
+      <circle cx="7.5" cy="10.5" r=".75" fill="currentColor" stroke="none" />
+      <circle cx="10" cy="7" r=".75" fill="currentColor" stroke="none" />
+      <circle cx="14.5" cy="7" r=".75" fill="currentColor" stroke="none" />
+      <circle cx="17" cy="10.5" r=".75" fill="currentColor" stroke="none" />
     </svg>
   )
 }
