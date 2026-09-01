@@ -31,7 +31,7 @@ router.get('/chart/:ticker', async (req, res) => {
   if (!TICKER_RE.test(ticker)) {
     return res.status(400).json({ error: 'Invalid ticker' })
   }
-  const range = ['1m', '3m', '6m', '1y'].includes(req.query.range)
+  const range = ['1d', '1m', '3m', '6m', '1y'].includes(req.query.range)
     ? req.query.range
     : '1y'
 

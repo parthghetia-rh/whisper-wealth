@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import {
   chunkSymbols, correlateBatch, RequestBudget, selectEffectivePrice,
+  chartOptionsForRange, normalizeChartData,
 } from '../server/services/stockService.js'
 
 test('quotes are batched at 50 symbols with no duplicates', () => {
@@ -33,6 +34,27 @@ test('extended market price becomes the effective price', () => {
   assert.deepEqual(selectEffectivePrice({
     marketState: 'CLOSED', regularMarketPrice: 100,
   }), { price: 100, source: 'regular' })
+})
+
+test('one-day charts use intraday data from only the latest market session', () => {
+  const now = new Date('2026-09-01T18:00:00Z')
+  const options = chartOptionsForRange('1d', now)
+  assert.equal(options.interval, '5m')
+  assert.equal(options.includePrePost, true)
+  assert.equal(now.getTime() - options.period1.getTime(), 7 * 24 * 60 * 60 * 1000)
+
+  const data = normalizeChartData({
+    meta: { exchangeTimezoneName: 'America/New_York' },
+    quotes: [
+      { date: new Date('2026-08-31T19:55:00Z'), close: 100 },
+      { date: new Date('2026-09-01T13:30:00Z'), close: 101 },
+      { date: new Date('2026-09-01T19:55:00Z'), close: 103 },
+    ],
+  }, '1d')
+  assert.deepEqual(data, [
+    { date: '2026-09-01T13:30:00.000Z', close: 101 },
+    { date: '2026-09-01T19:55:00.000Z', close: 103 },
+  ])
 })
 
 test('request budget blocks starts beyond its window limit', async () => {

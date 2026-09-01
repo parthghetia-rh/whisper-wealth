@@ -3,6 +3,7 @@ import { AreaChart, Area, XAxis, YAxis, ResponsiveContainer, Tooltip } from 'rec
 import { currencySymbol } from '../utils/currency'
 
 const RANGES = [
+  { label: '1D', value: '1d' },
   { label: '1M', value: '1m' },
   { label: '3M', value: '3m' },
   { label: '6M', value: '6m' },
@@ -97,6 +98,9 @@ export default function TickerChart({ ticker, currency }) {
               interval={Math.max(0, Math.floor(data.length / 6) - 1)}
               tickFormatter={(d) => {
                 const dt = new Date(d)
+                if (range === '1d') {
+                  return dt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+                }
                 return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
               }}
             />
@@ -108,7 +112,7 @@ export default function TickerChart({ ticker, currency }) {
               width={45}
               tickFormatter={(v) => `${sym}${v}`}
             />
-            <Tooltip content={<ChartTooltip sym={sym} />} />
+            <Tooltip content={<ChartTooltip sym={sym} intraday={range === '1d'} />} />
             <Area
               type="monotone"
               dataKey="close"
@@ -123,12 +127,16 @@ export default function TickerChart({ ticker, currency }) {
   )
 }
 
-function ChartTooltip({ active, payload, sym }) {
+function ChartTooltip({ active, payload, sym, intraday }) {
   if (!active || !payload?.length) return null
   const d = payload[0].payload
   return (
     <div className="bg-surface-3 border border-border rounded-lg px-3 py-2 text-sm shadow-lg">
-      <div className="text-text-muted text-xs">{d.date}</div>
+      <div className="text-text-muted text-xs">
+        {intraday
+          ? new Date(d.date).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+          : d.date}
+      </div>
       <div className="font-medium tabular-nums">
         {sym}{d.close.toFixed(2)}
       </div>

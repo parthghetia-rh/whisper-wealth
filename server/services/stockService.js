@@ -230,23 +230,53 @@ const chartCache = new Map()
 const CHART_CACHE_MS = 15 * 60 * 1000
 const MAX_CHART_CACHE = 100
 
+export function chartOptionsForRange(range, now = new Date()) {
+  const start = new Date(now)
+  if (range === '1d') {
+    // A full week guarantees a previous trading session after weekends/holidays.
+    start.setDate(start.getDate() - 7)
+    return { period1: start, period2: now, interval: '5m', includePrePost: true }
+  }
+  const months = { '1m': 1, '3m': 3, '6m': 6, '1y': 12 }[range] || 12
+  start.setMonth(start.getMonth() - months)
+  return { period1: start, period2: now, interval: months <= 3 ? '1d' : '1wk' }
+}
+
+function marketDate(date, timeZone) {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone, year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(date)
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]))
+  return `${values.year}-${values.month}-${values.day}`
+}
+
+export function normalizeChartData(result, range) {
+  const intraday = range === '1d'
+  const timeZone = result.meta?.exchangeTimezoneName || 'America/New_York'
+  let data = (result.quotes || []).map((q) => ({
+    date: intraday ? q.date?.toISOString() : q.date?.toISOString().split('T')[0],
+    marketDate: q.date ? marketDate(q.date, timeZone) : null,
+    close: Math.round((q.close ?? 0) * 100) / 100,
+  })).filter((q) => q.date && q.close > 0)
+  if (intraday && data.length) {
+    const latestSession = data.reduce(
+      (latest, point) => point.marketDate > latest ? point.marketDate : latest,
+      data[0].marketDate
+    )
+    data = data.filter((point) => point.marketDate === latestSession)
+  }
+  return data.map(({ marketDate: _marketDate, ...point }) => point)
+}
+
 export async function getChartData(ticker, range) {
   const key = `${ticker}:${range}`
   const cached = chartCache.get(key)
   if (cached && Date.now() - cached.at < CHART_CACHE_MS) return cached.data
   const now = new Date()
-  const months = { '1m': 1, '3m': 3, '6m': 6, '1y': 12 }[range] || 12
-  const start = new Date(now)
-  start.setMonth(start.getMonth() - months)
-  const result = await yahooRequest(() => yahooFinance.chart(ticker, {
-    period1: start.toISOString().split('T')[0],
-    period2: now.toISOString().split('T')[0],
-    interval: months <= 3 ? '1d' : '1wk',
-  }, timeoutOptions()))
-  const data = (result.quotes || []).map((q) => ({
-    date: q.date?.toISOString().split('T')[0],
-    close: Math.round((q.close ?? 0) * 100) / 100,
-  })).filter((q) => q.date && q.close > 0)
+  const result = await yahooRequest(() => yahooFinance.chart(
+    ticker, chartOptionsForRange(range, now), timeoutOptions()
+  ))
+  const data = normalizeChartData(result, range)
   if (chartCache.size >= MAX_CHART_CACHE) chartCache.delete(chartCache.keys().next().value)
   chartCache.set(key, { at: Date.now(), data })
   return data
