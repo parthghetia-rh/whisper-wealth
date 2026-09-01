@@ -326,16 +326,19 @@ export default function Layout({ onLogout }) {
       {/* Main content */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Mobile top bar */}
-        <div className="md:hidden flex items-center justify-between px-4 py-3 bg-surface-2 border-b border-border">
-          <NavLink to="/" className="flex items-center gap-2">
+        <div className="md:hidden flex items-center justify-between gap-3 px-4 py-2.5 bg-surface-2 border-b border-border">
+          <NavLink to="/" className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
             <Logo size={24} />
-            <span className="text-sm font-semibold text-text">WhisperWealth</span>
+            <span className="truncate text-sm font-semibold text-text">WhisperWealth</span>
           </NavLink>
-          <div className="flex items-center gap-1">
-            <NotificationBell />
+          <div className="ml-auto flex shrink-0 items-center gap-2.5">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg hover:bg-surface-3">
+              <NotificationBell />
+            </div>
             <NavLink
               to="/settings"
-              className="p-1.5 text-text-muted hover:text-text"
+              aria-label="Settings"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-text-muted hover:bg-surface-3 hover:text-text"
             >
               <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="9" cy="9" r="2.5" />
