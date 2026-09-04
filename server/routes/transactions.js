@@ -208,10 +208,21 @@ router.post('/import', (req, res) => {
   try { owner = readOwner(req.body) } catch (err) { return res.status(400).json({ error: err.message }) }
 
   let imported = 0
+  const skippedDetails = [...result.skipped]
   for (const t of result.transactions) {
+    const duplicate = stmtGet(
+      `SELECT 1 FROM transactions
+       WHERE ticker = ? AND type = ? AND shares = ? AND price_per_share = ? AND date = ? AND source = ?
+         AND ((member_id IS NULL AND ? IS NULL) OR member_id = ?)`,
+      [t.ticker, t.type, t.shares, t.price_per_share, t.date, t.source, owner.memberId, owner.memberId]
+    )
+    if (duplicate) {
+      skippedDetails.push({ ticker: t.ticker, reason: 'This imported position already exists' })
+      continue
+    }
     stmtRunBatch(
-      'INSERT INTO transactions (ticker, type, shares, price_per_share, date, member_id) VALUES (?, ?, ?, ?, ?, ?)',
-      [t.ticker, t.type, t.shares, t.price_per_share, t.date, owner.memberId]
+      'INSERT INTO transactions (ticker, type, shares, price_per_share, date, member_id, source) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [t.ticker, t.type, t.shares, t.price_per_share, t.date, owner.memberId, t.source || 'transaction_import']
     )
     const inWatchlist = stmtGet('SELECT 1 FROM watchlist WHERE ticker = ?', [t.ticker])
     if (!inWatchlist) {
@@ -223,7 +234,13 @@ router.post('/import', (req, res) => {
   updatePortfolioSnapshot()
   refreshAfterChange()
 
-  res.json({ imported, skipped: result.skipped.length, skippedDetails: result.skipped, owner_scope: owner.key })
+  res.json({
+    imported,
+    skipped: skippedDetails.length,
+    skippedDetails,
+    import_mode: mapping.mode || 'transactions',
+    owner_scope: owner.key,
+  })
 })
 
 export default router

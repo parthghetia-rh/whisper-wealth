@@ -44,6 +44,73 @@ function parseFile(text) {
   return { headers, rows, delimiter }
 }
 
+function normalizeHeader(value) {
+  return String(value || '').trim().toLowerCase().replace(/\s+/g, ' ')
+}
+
+function findHeader(headers, exact = [], partial = []) {
+  const normalizedExact = exact.map(normalizeHeader)
+  const exactMatch = headers.find((header) => normalizedExact.includes(normalizeHeader(header)))
+  if (exactMatch) return exactMatch
+  return headers.find((header) => {
+    const normalized = normalizeHeader(header)
+    return partial.some((candidate) => normalized.includes(normalizeHeader(candidate)))
+  }) || ''
+}
+
+export function detectImportLayout(headers) {
+  const tickerCol = findHeader(headers, ['Symbol', 'Ticker'], ['security symbol', 'stock symbol'])
+  const sharesCol = findHeader(headers, ['Quantity', 'Units', 'Shares', 'Qty'], ['number of units'])
+  const exchangeCol = findHeader(headers, ['Exchange', 'MIC', 'Market'], ['stock exchange'])
+  const bookValueCol = findHeader(
+    headers,
+    ['Book Value (Market)', 'Book Value', 'Total Cost', 'Book Cost'],
+    ['book value (market)', 'adjusted book value']
+  )
+  const averagePriceCol = findHeader(
+    headers,
+    ['Average Price', 'Average Cost', 'Avg Price', 'Avg Cost', 'Cost Per Share', 'Cost Per Unit'],
+    ['average price', 'average cost', 'book cost per unit']
+  )
+  const priceCol = averagePriceCol || findHeader(
+    headers,
+    ['Price', 'Unit Price', 'Price Per Share'],
+    ['execution price', 'trade price']
+  )
+  // Exact matching is intentional: Wealthsimple holdings reports contain
+  // "Account Type" and "Security Type", neither of which is a trade side.
+  const typeCol = findHeader(headers, ['Transaction Type', 'Type', 'Action', 'Side'], ['buy/sell'])
+  const dateCol = findHeader(headers, ['Date', 'Trade Date', 'Transaction Date'], ['settlement date'])
+  const normalizedHeaders = headers.map(normalizeHeader)
+  const holdingsEvidence = Boolean(bookValueCol || averagePriceCol) && (
+    normalizedHeaders.some((header) => (
+      header === 'position direction'
+      || header === 'security type'
+      || header.startsWith('book value')
+      || header === 'market value'
+    ))
+    || (!typeCol && !dateCol)
+  )
+  const mode = tickerCol && sharesCol && holdingsEvidence ? 'holdings' : 'transactions'
+  const mapping = Object.fromEntries(Object.entries({
+    tickerCol,
+    sharesCol,
+    exchangeCol,
+    bookValueCol: mode === 'holdings' ? bookValueCol : '',
+    priceCol,
+    dateCol: mode === 'transactions' ? dateCol : '',
+    typeCol: mode === 'transactions' ? typeCol : '',
+  }).filter(([, value]) => value))
+
+  return {
+    mode,
+    mapping,
+    provider: holdingsEvidence && normalizedHeaders.some((header) => header === 'position direction')
+      ? 'wealthsimple'
+      : null,
+  }
+}
+
 function normalizeAmount(val) {
   if (!val) return NaN
   return Number(val.replace(/[^\d.\-]/g, '').replace(/−/g, '-'))
@@ -70,7 +137,16 @@ function normalizeDate(val) {
 export function parseHeaders(text) {
   const { headers, rows, delimiter } = parseFile(text)
   const sample = rows.slice(0, 3)
-  return { headers, rowCount: rows.length, delimiter: delimiter === '\t' ? 'tab' : 'comma', sample }
+  const detected = detectImportLayout(headers)
+  return {
+    headers,
+    rowCount: rows.length,
+    delimiter: delimiter === '\t' ? 'tab' : 'comma',
+    sample,
+    suggestedMode: detected.mode,
+    suggestedMapping: detected.mapping,
+    detectedProvider: detected.provider,
+  }
 }
 
 const EXCHANGE_SUFFIX = {
@@ -138,7 +214,9 @@ export function importWithMapping(text, mapping) {
 
   const transactions = []
   const skipped = []
-  const today = new Date().toISOString().split('T')[0]
+  const today = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Toronto', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).format(new Date())
 
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i]
@@ -179,6 +257,7 @@ export function importWithMapping(text, mapping) {
         shares,
         price_per_share: Math.round(price * 10000) / 10000,
         date: today,
+        source: 'holdings_import',
       })
     } else {
       if (!priceCol) {
@@ -215,7 +294,7 @@ export function importWithMapping(text, mapping) {
         }
       }
 
-      transactions.push({ ticker, type, shares, price_per_share: price, date })
+      transactions.push({ ticker, type, shares, price_per_share: price, date, source: 'transaction_import' })
     }
   }
 

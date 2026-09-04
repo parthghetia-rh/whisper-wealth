@@ -15,6 +15,7 @@ export default function CSVImport({ onImported }) {
   const [delimiter, setDelimiter] = useState('')
   const [rowCount, setRowCount] = useState(0)
   const [mode, setMode] = useState('transactions')
+  const [detectedProvider, setDetectedProvider] = useState(null)
   const [mapping, setMapping] = useState({})
   const [preview, setPreview] = useState(null)
   const [pdfRawText, setPdfRawText] = useState(null)
@@ -40,6 +41,7 @@ export default function CSVImport({ onImported }) {
     setResult(null)
     setError(null)
     setMode('transactions')
+    setDetectedProvider(null)
   }
 
   const handleFile = async (file) => {
@@ -99,7 +101,7 @@ export default function CSVImport({ onImported }) {
           setPreview({ ...data, skipped: data.skipped || [] })
           setPdfRawText(data.rawText)
           if (!data.transactions?.length) {
-            setError('No transactions found in PDF. Check the extracted text below.')
+            setError('No buy/sell transactions found. To import current positions, download the Wealthsimple Holdings report as CSV and import it as Current Holdings.')
           }
           setStep('preview')
         }
@@ -123,7 +125,9 @@ export default function CSVImport({ onImported }) {
           setSample(data.sample)
           setRowCount(data.rowCount)
           setDelimiter(data.delimiter)
-          setMapping({})
+          setMode(data.suggestedMode || 'transactions')
+          setMapping(data.suggestedMapping || {})
+          setDetectedProvider(data.detectedProvider || null)
           setStep('map')
         }
       } catch (err) {
@@ -346,6 +350,12 @@ export default function CSVImport({ onImported }) {
             </div>
           </div>
 
+          {detectedProvider === 'wealthsimple' && mode === 'holdings' && (
+            <div className="text-xs text-accent bg-accent/10 rounded-lg px-3 py-2">
+              Wealthsimple holdings detected. Each position will become an opening Buy using its units and average/book cost.
+            </div>
+          )}
+
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
             <MappingSelect
               label="Ticker / Symbol *"
@@ -371,18 +381,18 @@ export default function CSVImport({ onImported }) {
             {mode === 'holdings' ? (
               <>
                 <MappingSelect
-                  label="Book Value (total cost)"
+                  label="Book Value / Total Cost"
                   value={mapping.bookValueCol}
                   onChange={(v) => updateMapping('bookValueCol', v)}
                   headers={headers}
                   hints={['book value', 'cost', 'total cost']}
                 />
                 <MappingSelect
-                  label="Price (fallback if no book value)"
+                  label="Average Cost / Price per Unit"
                   value={mapping.priceCol}
                   onChange={(v) => updateMapping('priceCol', v)}
                   headers={headers}
-                  hints={['market price', 'price', 'last price']}
+                  hints={['average price', 'average cost', 'avg price', 'avg cost', 'cost per share', 'cost per unit', 'price']}
                 />
               </>
             ) : (
@@ -411,6 +421,12 @@ export default function CSVImport({ onImported }) {
               </>
             )}
           </div>
+
+          {mode === 'holdings' && (
+            <p className="text-[11px] text-text-muted leading-relaxed">
+              Holdings are added as opening Buy transactions dated today. Market value is not used as cost basis.
+            </p>
+          )}
 
           {sample.length > 0 && (
             <details className="text-xs">
@@ -509,7 +525,7 @@ export default function CSVImport({ onImported }) {
                         <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
                           t.type === 'buy' ? 'bg-green/15 text-green' : 'bg-red/15 text-red'
                         }`}>
-                          {t.type.toUpperCase()}
+                          {mode === 'holdings' && fileType !== 'pdf' ? 'OPENING BUY' : t.type.toUpperCase()}
                         </span>
                       </td>
                       <td className="text-right p-2 tabular-nums">{t.shares}</td>
@@ -550,7 +566,9 @@ export default function CSVImport({ onImported }) {
                   <path d="M12 2a10 10 0 0 1 10 10" />
                 </svg>
               )}
-              {loading ? 'Importing...' : `Import ${preview.transactions.length} Transaction${preview.transactions.length !== 1 ? 's' : ''}`}
+              {loading
+                ? 'Importing...'
+                : `Import ${preview.transactions.length} ${mode === 'holdings' && fileType !== 'pdf' ? `Holding${preview.transactions.length !== 1 ? 's' : ''}` : `Transaction${preview.transactions.length !== 1 ? 's' : ''}`}`}
             </button>
             <button
               onClick={() => fileType === 'pdf' ? reset() : setStep('map')}
@@ -565,7 +583,7 @@ export default function CSVImport({ onImported }) {
       {step === 'done' && result && (
         <div className="space-y-3">
           <div className="text-green text-sm bg-green/10 rounded-lg px-4 py-3">
-            Imported {result.imported} transaction{result.imported !== 1 ? 's' : ''} successfully
+            Imported {result.imported} {result.import_mode === 'holdings' ? `holding${result.imported !== 1 ? 's' : ''}` : `transaction${result.imported !== 1 ? 's' : ''}`} successfully
             {result.skipped > 0 && ` (${result.skipped} rows skipped)`}
           </div>
           <button
@@ -581,9 +599,13 @@ export default function CSVImport({ onImported }) {
 }
 
 function MappingSelect({ label, value, onChange, headers, hints }) {
-  const autoDetected = !value && hints
-    ? headers.find((h) => hints.some((hint) => h.toLowerCase().includes(hint)))
+  const normalized = (text) => String(text || '').trim().toLowerCase().replace(/\s+/g, ' ')
+  const exact = !value && hints
+    ? headers.find((header) => hints.some((hint) => normalized(header) === normalized(hint)))
     : null
+  const autoDetected = exact || (!value && hints
+    ? headers.find((header) => hints.some((hint) => normalized(hint).length > 4 && normalized(header).includes(normalized(hint))))
+    : null)
 
   const effectiveValue = value || autoDetected || NONE
 
