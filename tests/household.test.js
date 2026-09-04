@@ -59,7 +59,7 @@ test('v2 data migrates to Primary and household scopes stay isolated without pro
 
   const dbModule = await import('../server/db.js')
   const { stmtAll, stmtGet, stmtRun } = dbModule
-  const { updatePortfolioSnapshot } = await import('../server/services/marketDataService.js')
+  const { torontoDate, updatePortfolioSnapshot } = await import('../server/services/marketDataService.js')
   const { getProviderMetrics } = await import('../server/services/stockService.js')
   const householdRouter = (await import('../server/routes/household.js')).default
   const transactionsRouter = (await import('../server/routes/transactions.js')).default
@@ -149,6 +149,40 @@ test('v2 data migrates to Primary and household scopes stay isolated without pro
     `${base}/api/portfolio/history?scope=member:${primary.id}&currency=USD&range=1y`
   ).then((response) => response.json())
   assert.ok(primaryHistory.data.some((snapshot) => snapshot.date === '2026-01-01' && snapshot.value === 150))
+  assert.equal(getProviderMetrics().total_requests, beforeRequests)
+
+  const incompleteDate = torontoDate(new Date(Date.now() - 3 * 86400000))
+  stmtRun(`INSERT INTO portfolio_snapshots_v3
+    (date, scope_key, currency, total_value, total_cost, annual_dividends, positions)
+    VALUES (?, 'household', 'USD', 100, 80, 0, 1)`, [incompleteDate])
+  stmtRun(`INSERT INTO portfolio_snapshots_v3
+    (date, scope_key, currency, total_value, total_cost, annual_dividends, positions)
+    VALUES (?, 'household', 'CAD', 100, 80, 0, 1)`, [incompleteDate])
+  stmtRun(`INSERT INTO snapshot_fx_rates (date, currency, usd_rate)
+    VALUES (?, 'USD', 1)`, [incompleteDate])
+  stmtRun("UPDATE quotes SET price = 225, regular_market_price = 225 WHERE ticker = 'AAPL'")
+  stmtRun(`INSERT INTO quotes
+    (ticker, currency, price, regular_market_price, status, last_success_at)
+    VALUES ('SHOP.TO', 'CAD', 100, 100, 'fresh', datetime('now'))`)
+  stmtRun(`INSERT INTO transactions
+    (ticker, type, shares, price_per_share, date, member_id)
+    VALUES ('SHOP.TO', 'buy', 2, 80, '2026-02-01', ?)`, [primary.id])
+  stmtRun("INSERT INTO fx_rates (currency, usd_rate) VALUES ('CAD', 0.75)")
+
+  const currentSummary = await fetch(`${base}/api/portfolio/summary?scope=household`)
+    .then((response) => response.json())
+  const currentHistory = await fetch(
+    `${base}/api/portfolio/history?scope=household&currency=USD&range=1y`
+  ).then((response) => response.json())
+  const livePoint = currentHistory.data.at(-1)
+  const currentValueUsd = currentSummary.currencies.reduce((total, row) => (
+    total + row.total_value * (row.currency === 'CAD' ? 0.75 : 1)
+  ), 0)
+  assert.equal(livePoint.date, torontoDate())
+  assert.equal(livePoint.source, 'live')
+  assert.equal(livePoint.value, currentValueUsd)
+  assert.equal(currentHistory.data.some((snapshot) => snapshot.date === incompleteDate), false)
+  assert.equal(currentHistory.excluded_incomplete, 1)
   assert.equal(getProviderMetrics().total_requests, beforeRequests)
 
   const invalidOwner = await fetch(`${base}/api/transactions`, {

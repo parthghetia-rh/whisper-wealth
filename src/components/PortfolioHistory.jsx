@@ -14,20 +14,34 @@ export default function PortfolioHistory({ displayCurrency, mode, onClose }) {
   const { scopedUrl } = useHousehold()
   const [range, setRange] = useState('1y')
   const [data, setData] = useState(null)
+  const [meta, setMeta] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
 
   useEffect(() => {
+    const controller = new AbortController()
     setLoading(true)
+    setError(null)
     const token = localStorage.getItem('folio-auth-token')
     fetch(scopedUrl(`/api/portfolio/history?range=${range}&currency=${encodeURIComponent(displayCurrency)}`), {
       headers: { Authorization: `Bearer ${token}` },
+      signal: controller.signal,
     })
-      .then((r) => r.json())
+      .then((response) => {
+        if (!response.ok) throw new Error(`HTTP ${response.status}`)
+        return response.json()
+      })
       .then((d) => {
         setData(d.data || [])
+        setMeta(d)
         setLoading(false)
       })
-      .catch(() => setLoading(false))
+      .catch((err) => {
+        if (err.name === 'AbortError') return
+        setError('Unable to load accurate portfolio history')
+        setLoading(false)
+      })
+    return () => controller.abort()
   }, [range, displayCurrency, scopedUrl])
 
   const dataKey = mode === 'gain' ? 'gain' : 'value'
@@ -47,7 +61,7 @@ export default function PortfolioHistory({ displayCurrency, mode, onClose }) {
           {data && data.length > 1 && (
             <p className={`text-xs tabular-nums mt-0.5 ${isUp ? 'text-green' : 'text-red'}`}>
               {isUp ? '+' : ''}{formatCurrency(change, displayCurrency)} ({isUp ? '+' : ''}{changePct}%)
-              {' '}over {RANGES.find((r) => r.value === range)?.label}
+              {' '}since {formatSnapshotDate(data[0].date, { year: 'numeric' })}
             </p>
           )}
         </div>
@@ -79,6 +93,10 @@ export default function PortfolioHistory({ displayCurrency, mode, onClose }) {
         <div className="h-[200px] flex items-center justify-center text-text-muted text-xs">
           Loading chart...
         </div>
+      ) : error ? (
+        <div className="h-[200px] flex items-center justify-center text-red text-xs">
+          {error}
+        </div>
       ) : !data || data.length < 2 ? (
         <div className="h-[200px] flex items-center justify-center text-text-muted text-xs">
           Not enough data
@@ -98,10 +116,7 @@ export default function PortfolioHistory({ displayCurrency, mode, onClose }) {
               axisLine={false}
               tickLine={false}
               interval={Math.max(0, Math.floor(data.length / 6) - 1)}
-              tickFormatter={(d) => {
-                const dt = new Date(d)
-                return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-              }}
+              tickFormatter={(date) => formatSnapshotDate(date)}
             />
             <YAxis
               domain={['auto', 'auto']}
@@ -113,11 +128,14 @@ export default function PortfolioHistory({ displayCurrency, mode, onClose }) {
             />
             <Tooltip content={<ChartTooltip displayCurrency={displayCurrency} dataKey={dataKey} />} />
             <Area
-              type="monotone"
+              type="linear"
               dataKey={dataKey}
               stroke={isUp ? '#22c55e' : '#ef4444'}
               strokeWidth={1.5}
               fill="url(#portfolioGrad)"
+              dot={data.length <= 31 ? { r: 2, strokeWidth: 0 } : false}
+              activeDot={{ r: 4 }}
+              isAnimationActive={false}
             />
             {mode === 'gain' && (
               <Area
@@ -132,6 +150,14 @@ export default function PortfolioHistory({ displayCurrency, mode, onClose }) {
           </AreaChart>
         </ResponsiveContainer>
       )}
+      {!loading && !error && data?.length > 0 && (
+        <div className="space-y-1 text-[10px] text-text-muted/70">
+          <p>Daily snapshots; the latest point uses the same current prices and FX rates as the dashboard.</p>
+          {meta?.excluded_incomplete > 0 && (
+            <p>{meta.excluded_incomplete} incomplete snapshot{meta.excluded_incomplete === 1 ? '' : 's'} omitted because an FX rate was unavailable.</p>
+          )}
+        </div>
+      )}
     </div>
   )
 }
@@ -141,7 +167,9 @@ function ChartTooltip({ active, payload, displayCurrency, dataKey }) {
   const d = payload[0].payload
   return (
     <div className="bg-surface-3 border border-border rounded-lg px-3 py-2 text-sm shadow-lg">
-      <div className="text-text-muted text-xs">{d.date}</div>
+      <div className="text-text-muted text-xs">
+        {formatSnapshotDate(d.date, { year: 'numeric' })}{d.source === 'live' ? ' · Current' : ''}
+      </div>
       <div className="font-medium tabular-nums">
         {formatCurrency(d[dataKey], displayCurrency)}
       </div>
@@ -152,4 +180,16 @@ function ChartTooltip({ active, payload, displayCurrency, dataKey }) {
       )}
     </div>
   )
+}
+
+function formatSnapshotDate(value, extraOptions = {}) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value || '')
+  if (!match) return value
+  const [, year, month, day] = match
+  return new Intl.DateTimeFormat('en-US', {
+    timeZone: 'UTC',
+    month: 'short',
+    day: 'numeric',
+    ...extraOptions,
+  }).format(new Date(Date.UTC(Number(year), Number(month) - 1, Number(day))))
 }

@@ -67,6 +67,65 @@ function getAnnualDividendPerShare(ticker) {
   return rows.reduce((sum, r) => sum + r.amount, 0)
 }
 
+function portfolioTotalsByCurrency(scope) {
+  const holdings = getHoldings(scope)
+  const byCurrency = {}
+  let unpricedPositions = 0
+
+  for (const holding of holdings) {
+    const quote = stmtGet('SELECT * FROM quotes WHERE ticker = ?', [holding.ticker])
+    const currentPrice = quote?.price ?? null
+    const marketValue = currentPrice == null ? 0 : holding.shares * currentPrice
+    const annualDividend = holding.shares * getAnnualDividendPerShare(holding.ticker)
+    const currency = quote?.currency || 'USD'
+
+    if (currentPrice == null) unpricedPositions++
+    if (!byCurrency[currency]) {
+      byCurrency[currency] = {
+        total_value: 0,
+        total_cost: 0,
+        annual_dividends: 0,
+        positions: 0,
+      }
+    }
+
+    byCurrency[currency].total_value += marketValue
+    byCurrency[currency].total_cost += holding.total_cost
+    byCurrency[currency].annual_dividends += annualDividend
+    byCurrency[currency].positions++
+  }
+
+  for (const cash of ownedRows('cash_positions', scope)) {
+    const type = cash.type || 'cash'
+    const currency = cash.currency || 'USD'
+    if (!byCurrency[currency]) {
+      byCurrency[currency] = {
+        total_value: 0,
+        total_cost: 0,
+        annual_dividends: 0,
+        positions: 0,
+      }
+    }
+
+    if (type === 'income') {
+      const frequency = cash.frequency || 'yearly'
+      byCurrency[currency].annual_dividends += frequency === 'weekly'
+        ? cash.amount * 52
+        : frequency === 'monthly' ? cash.amount * 12 : cash.amount
+      continue
+    }
+
+    const compound = getSettingBool('cash_interest_compound')
+    byCurrency[currency].total_value += cash.amount
+    byCurrency[currency].total_cost += cash.amount
+    byCurrency[currency].annual_dividends += compound
+      ? cash.amount * Math.pow(1 + cash.interest_rate / 100 / 12, 12) - cash.amount
+      : cash.amount * (cash.interest_rate / 100)
+  }
+
+  return { byCurrency, unpricedPositions }
+}
+
 router.get('/', (req, res) => {
   let scope
   try { scope = readScope(req) } catch (err) { return res.status(400).json({ error: err.message }) }
@@ -118,63 +177,7 @@ router.get('/', (req, res) => {
 router.get('/summary', (req, res) => {
   let scope
   try { scope = readScope(req) } catch (err) { return res.status(400).json({ error: err.message }) }
-  const holdings = getHoldings(scope)
-  let unpricedPositions = 0
-
-  const byCurrency = {}
-
-  for (const h of holdings) {
-    const quote = stmtGet('SELECT * FROM quotes WHERE ticker = ?', [h.ticker])
-    const current_price = quote?.price ?? null
-    const market_value = current_price == null ? 0 : h.shares * current_price
-    if (current_price == null) unpricedPositions++
-    const annual_div_per_share = getAnnualDividendPerShare(h.ticker)
-    const annual_div = h.shares * annual_div_per_share
-    const currency = quote?.currency || 'USD'
-
-    if (!byCurrency[currency]) {
-      byCurrency[currency] = {
-        total_value: 0,
-        total_cost: 0,
-        annual_dividends: 0,
-        positions: 0,
-      }
-    }
-
-    byCurrency[currency].total_value += market_value
-    byCurrency[currency].total_cost += h.total_cost
-    byCurrency[currency].annual_dividends += annual_div
-    byCurrency[currency].positions += 1
-  }
-
-  const cashRows = ownedRows('cash_positions', scope)
-  for (const c of cashRows) {
-    const type = c.type || 'cash'
-    let annual_income
-    if (type === 'income') {
-      const freq = c.frequency || 'yearly'
-      annual_income = freq === 'weekly' ? c.amount * 52 : freq === 'monthly' ? c.amount * 12 : c.amount
-    } else {
-      const compound = getSettingBool('cash_interest_compound')
-      annual_income = compound
-        ? c.amount * Math.pow(1 + c.interest_rate / 100 / 12, 12) - c.amount
-        : c.amount * (c.interest_rate / 100)
-    }
-    const currency = c.currency
-    if (!byCurrency[currency]) {
-      byCurrency[currency] = {
-        total_value: 0,
-        total_cost: 0,
-        annual_dividends: 0,
-        positions: 0,
-      }
-    }
-    if (type === 'cash') {
-      byCurrency[currency].total_value += c.amount
-      byCurrency[currency].total_cost += c.amount
-    }
-    byCurrency[currency].annual_dividends += annual_income
-  }
+  const { byCurrency, unpricedPositions } = portfolioTotalsByCurrency(scope)
 
   const currencies = Object.entries(byCurrency).map(([currency, data]) => {
     const total_gain = data.total_value - data.total_cost
@@ -215,6 +218,22 @@ function convert(amount, from, to, rates) {
   return (amount * rates[from]) / rates[to]
 }
 
+function aggregateCurrencyRows(rows, currency, rates, date) {
+  if (!rows.length) return null
+  const result = { total_value: 0, total_cost: 0, positions: 0 }
+  for (const row of rows) {
+    const value = convert(row.total_value, row.currency, currency, rates)
+    const cost = convert(row.total_cost, row.currency, currency, rates)
+    // A partial total creates a false dip in the chart. Exclude the whole point
+    // until every currency in that snapshot can be converted.
+    if (value == null || cost == null) return null
+    result.total_value += value
+    result.total_cost += cost
+    result.positions += row.positions
+  }
+  return { ...result, date, total_gain: result.total_value - result.total_cost }
+}
+
 function convertedSnapshot(date, currency, scopeKey) {
   if (!date) return null
   const rows = stmtAll(
@@ -226,16 +245,20 @@ function convertedSnapshot(date, currency, scopeKey) {
   for (const row of stmtAll('SELECT currency, usd_rate FROM snapshot_fx_rates WHERE date = ?', [date])) {
     rates[row.currency] = row.usd_rate
   }
-  if (!rates[currency]) return null
-  const result = rows.reduce((total, row) => {
-    const value = convert(row.total_value, row.currency, currency, rates)
-    const cost = convert(row.total_cost, row.currency, currency, rates)
-    if (value != null) total.total_value += value
-    if (cost != null) total.total_cost += cost
-    total.positions += row.positions
-    return total
-  }, { total_value: 0, total_cost: 0, positions: 0 })
-  return { ...result, date, total_gain: result.total_value - result.total_cost }
+  return aggregateCurrencyRows(rows, currency, rates, date)
+}
+
+function currentPortfolioSnapshot(scope, currency) {
+  const { byCurrency } = portfolioTotalsByCurrency(scope)
+  const rows = Object.entries(byCurrency).map(([rowCurrency, totals]) => ({
+    currency: rowCurrency,
+    ...totals,
+    // Match the per-currency precision returned by /summary so the chart's
+    // current point and the dashboard card display the exact same total.
+    total_value: Math.round(totals.total_value * 100) / 100,
+    total_cost: Math.round(totals.total_cost * 100) / 100,
+  }))
+  return aggregateCurrencyRows(rows, currency, getRates(), torontoDate())
 }
 
 function snapshotDateAtOrBefore(date, scopeKey) {
@@ -263,7 +286,8 @@ router.get('/snapshot', (req, res) => {
   const yesterday = torontoDate(new Date(Date.now() - 86400000))
   const weekAgo = torontoDate(new Date(Date.now() - 7 * 86400000))
   const monthAgo = torontoDate(new Date(Date.now() - 30 * 86400000))
-  const todaySnap = convertedSnapshot(snapshotDateAtOrBefore(today, scope.key), currency, scope.key)
+  const todaySnap = currentPortfolioSnapshot(scope, currency)
+    || convertedSnapshot(snapshotDateAtOrBefore(today, scope.key), currency, scope.key)
   const yesterdaySnap = convertedSnapshot(snapshotDateAtOrBefore(yesterday, scope.key), currency, scope.key)
   const weekSnap = convertedSnapshot(snapshotDateAtOrBefore(weekAgo, scope.key), currency, scope.key)
   const monthSnap = convertedSnapshot(snapshotDateAtOrBefore(monthAgo, scope.key), currency, scope.key)
@@ -329,21 +353,36 @@ router.get('/history', (req, res) => {
     [cutoffStr, scope.key]
   )
 
-  if (!dates.length) {
-    return res.json({ data: [], range, currency, scope: scope.key, legacy_archived: true })
-  }
-
   try {
-    const data = dates.map(({ date }) => convertedSnapshot(date, currency, scope.key))
-      .filter(Boolean)
+    const stored = dates.map(({ date }) => convertedSnapshot(date, currency, scope.key))
+    const excludedIncomplete = stored.filter((snapshot) => !snapshot).length
+    const snapshots = stored.filter(Boolean)
+    const current = currentPortfolioSnapshot(scope, currency)
+    if (current) {
+      const todayIndex = snapshots.findIndex((snapshot) => snapshot.date === current.date)
+      if (todayIndex >= 0) snapshots[todayIndex] = current
+      else snapshots.push(current)
+    }
+
+    const data = snapshots
+      .sort((a, b) => a.date.localeCompare(b.date))
       .map((snapshot) => ({
         date: snapshot.date,
         value: Math.round(snapshot.total_value * 100) / 100,
         cost: Math.round(snapshot.total_cost * 100) / 100,
         gain: Math.round(snapshot.total_gain * 100) / 100,
+        source: snapshot.date === current?.date ? 'live' : 'snapshot',
       }))
 
-    res.json({ data, range, currency, scope: scope.key, legacy_archived: true })
+    res.json({
+      data,
+      range,
+      currency,
+      scope: scope.key,
+      as_of: stmtGet('SELECT MAX(last_success_at) AS value FROM quotes')?.value || null,
+      excluded_incomplete: excludedIncomplete,
+      legacy_archived: true,
+    })
   } catch (err) {
     console.error('Portfolio history failed:', err.message)
     res.status(500).json({ error: 'Failed to load portfolio history' })
