@@ -12,7 +12,7 @@ const RANGES = [
 
 export default function PortfolioHistory({ displayCurrency, mode, onClose }) {
   const { scopedUrl } = useHousehold()
-  const [range, setRange] = useState('1y')
+  const [range, setRange] = useState('1m')
   const [data, setData] = useState(null)
   const [meta, setMeta] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -44,6 +44,12 @@ export default function PortfolioHistory({ displayCurrency, mode, onClose }) {
     return () => controller.abort()
   }, [range, displayCurrency, scopedUrl])
 
+  useEffect(() => {
+    if (meta?.available_ranges?.length && !meta.available_ranges.includes(range)) {
+      setRange(meta.available_ranges.at(-1))
+    }
+  }, [meta, range])
+
   const dataKey = mode === 'gain' ? 'gain' : 'value'
   const label = mode === 'gain' ? 'Gain/Loss' : 'Portfolio Value'
 
@@ -67,19 +73,30 @@ export default function PortfolioHistory({ displayCurrency, mode, onClose }) {
         </div>
         <div className="flex items-center gap-2">
           <div className="flex rounded-lg border border-border overflow-hidden">
-            {RANGES.map((r) => (
-              <button
-                key={r.value}
-                onClick={() => setRange(r.value)}
-                className={`px-2.5 py-1 text-[11px] font-medium transition-colors ${
-                  range === r.value
-                    ? 'bg-accent text-white'
-                    : 'bg-surface-3 text-text-muted hover:text-text'
-                }`}
-              >
-                {r.label}
-              </button>
-            ))}
+            {RANGES.map((r) => {
+              const available = !meta?.available_ranges || meta.available_ranges.includes(r.value)
+              const unlockDate = meta?.range_unlocks?.[r.value]
+              return (
+                <button
+                  key={r.value}
+                  type="button"
+                  disabled={!available}
+                  onClick={() => setRange(r.value)}
+                  title={available
+                    ? `${r.label} history`
+                    : `Available ${formatSnapshotDate(unlockDate, { year: 'numeric' })}`}
+                  className={`px-2.5 py-1 text-[11px] font-medium transition-colors ${
+                    range === r.value
+                      ? 'bg-accent text-white'
+                      : available
+                        ? 'bg-surface-3 text-text-muted hover:text-text'
+                        : 'cursor-not-allowed bg-surface-3 text-text-muted/30'
+                  }`}
+                >
+                  {r.label}
+                </button>
+              )
+            })}
           </div>
           <button onClick={onClose} className="p-1 text-text-muted hover:text-text">
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
@@ -153,6 +170,12 @@ export default function PortfolioHistory({ displayCurrency, mode, onClose }) {
       {!loading && !error && data?.length > 0 && (
         <div className="space-y-1 text-[10px] text-text-muted/70">
           <p>Daily snapshots; the latest point uses the same current prices and FX rates as the dashboard.</p>
+          {meta?.available_from && meta?.available_ranges?.length < RANGES.length && (
+            <p>
+              Accurate history began {formatSnapshotDate(meta.available_from, { year: 'numeric' })}.
+              {' '}Longer ranges unlock as enough daily snapshots accumulate.
+            </p>
+          )}
           {meta?.excluded_incomplete > 0 && (
             <p>{meta.excluded_incomplete} incomplete snapshot{meta.excluded_incomplete === 1 ? '' : 's'} omitted because an FX rate was unavailable.</p>
           )}

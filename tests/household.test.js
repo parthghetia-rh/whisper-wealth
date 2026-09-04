@@ -185,6 +185,13 @@ test('v2 data migrates to Primary and household scopes stay isolated without pro
   assert.equal(currentHistory.excluded_incomplete, 1)
   assert.equal(getProviderMetrics().total_requests, beforeRequests)
 
+  const limitedHistory = await fetch(
+    `${base}/api/portfolio/history?scope=shared&currency=USD&range=1y`
+  ).then((response) => response.json())
+  assert.equal(limitedHistory.available_from, torontoDate())
+  assert.deepEqual(limitedHistory.available_ranges, ['1m'])
+  assert.ok(limitedHistory.range_unlocks['3m'])
+
   const invalidOwner = await fetch(`${base}/api/transactions`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ ...transactionBody, owner_scope: 'household' }),

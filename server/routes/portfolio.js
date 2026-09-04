@@ -8,6 +8,36 @@ import { getSettingBool } from './settings.js'
 import { ownedRows, ownerFields, readScope, scopeWhere } from '../services/household.js'
 
 const router = Router()
+const HISTORY_MONTHS = { '1m': 1, '3m': 3, '6m': 6, '1y': 12 }
+const HISTORY_RANGES = Object.keys(HISTORY_MONTHS)
+
+function historyCutoff(range, date = new Date()) {
+  const cutoff = new Date(date)
+  cutoff.setMonth(cutoff.getMonth() - HISTORY_MONTHS[range])
+  return torontoDate(cutoff)
+}
+
+function addMonths(dateText, months) {
+  const date = new Date(`${dateText}T12:00:00Z`)
+  const day = date.getUTCDate()
+  date.setUTCDate(1)
+  date.setUTCMonth(date.getUTCMonth() + months)
+  const lastDay = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 0)).getUTCDate()
+  date.setUTCDate(Math.min(day, lastDay))
+  return date.toISOString().slice(0, 10)
+}
+
+function historyAvailability(availableFrom) {
+  if (!availableFrom) return { availableRanges: ['1m'], rangeUnlocks: {} }
+  const availableRanges = HISTORY_RANGES.filter((candidate, index) => (
+    index === 0 || availableFrom <= historyCutoff(candidate)
+  ))
+  const rangeUnlocks = Object.fromEntries(HISTORY_RANGES.map((candidate) => [
+    candidate,
+    candidate === '1m' ? availableFrom : addMonths(availableFrom, HISTORY_MONTHS[candidate]),
+  ]))
+  return { availableRanges, rangeUnlocks }
+}
 
 function getHoldings(scope) {
   const where = scopeWhere(scope, 't.member_id')
@@ -341,11 +371,12 @@ router.get('/history', (req, res) => {
   let scope
   try { scope = readScope(req) } catch (err) { return res.status(400).json({ error: err.message }) }
   const currency = requestedCurrency(req)
-  const range = ['1m', '3m', '6m', '1y'].includes(req.query.range) ? req.query.range : '1y'
-  const months = { '1m': 1, '3m': 3, '6m': 6, '1y': 12 }[range] || 12
-  const cutoff = new Date()
-  cutoff.setMonth(cutoff.getMonth() - months)
-  const cutoffStr = torontoDate(cutoff)
+  const range = HISTORY_RANGES.includes(req.query.range) ? req.query.range : '1m'
+  const cutoffStr = historyCutoff(range)
+  const storedAvailability = stmtGet(
+    'SELECT MIN(date) AS available_from, MAX(date) AS available_to FROM portfolio_snapshots_v3 WHERE scope_key = ?',
+    [scope.key]
+  )
 
   const dates = stmtAll(
     `SELECT DISTINCT date FROM portfolio_snapshots_v3
@@ -363,6 +394,9 @@ router.get('/history', (req, res) => {
       if (todayIndex >= 0) snapshots[todayIndex] = current
       else snapshots.push(current)
     }
+    const availableFrom = storedAvailability?.available_from || current?.date || null
+    const availableTo = current?.date || storedAvailability?.available_to || null
+    const { availableRanges, rangeUnlocks } = historyAvailability(availableFrom)
 
     const data = snapshots
       .sort((a, b) => a.date.localeCompare(b.date))
@@ -380,6 +414,10 @@ router.get('/history', (req, res) => {
       currency,
       scope: scope.key,
       as_of: stmtGet('SELECT MAX(last_success_at) AS value FROM quotes')?.value || null,
+      available_from: availableFrom,
+      available_to: availableTo,
+      available_ranges: availableRanges,
+      range_unlocks: rangeUnlocks,
       excluded_incomplete: excludedIncomplete,
       legacy_archived: true,
     })
