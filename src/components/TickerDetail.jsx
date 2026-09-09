@@ -103,7 +103,7 @@ export default function TickerDetail({ quote, item, onUpdate }) {
           </p>
           <div className="space-y-1">
             {tickerTxns.map((t) => (
-              <div key={t.id} className="flex items-center justify-between py-0.5">
+              <div key={t.id} className="flex flex-col gap-1 py-1 min-[420px]:flex-row min-[420px]:items-center min-[420px]:justify-between">
                 <div className="flex items-center gap-2">
                   <span className={`px-1.5 py-0.5 rounded text-[9px] font-medium ${
                     t.type === 'buy' ? 'bg-green/15 text-green' : 'bg-red/15 text-red'
@@ -112,7 +112,7 @@ export default function TickerDetail({ quote, item, onUpdate }) {
                   </span>
                   <span className="tabular-nums">{t.shares} @ {sym}{t.price_per_share.toFixed(2)}</span>
                 </div>
-                <span className="text-text-muted tabular-nums">{t.date}</span>
+                <span className="self-end tabular-nums text-text-muted min-[420px]:self-auto">{t.date}</span>
               </div>
             ))}
           </div>

@@ -41,9 +41,9 @@ export default function TickerChart({ ticker, currency }) {
       : '0.00'
 
   return (
-    <div className="bg-surface-3/50 p-4">
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-3">
+    <div className="bg-surface-3/50 p-3 sm:p-4">
+      <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+        <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
           <span className="text-sm font-medium">{ticker}</span>
           {data && data.length > 1 && (
             <span
@@ -57,15 +57,21 @@ export default function TickerChart({ ticker, currency }) {
             </span>
           )}
         </div>
-        <div className="flex rounded-lg border border-border overflow-hidden">
+        <div
+          role="group"
+          aria-label={`${ticker} chart period`}
+          className="grid w-full grid-cols-3 gap-1 rounded-xl border border-border bg-surface-2/70 p-1 sm:flex sm:w-auto sm:shrink-0 sm:gap-0 sm:overflow-hidden sm:rounded-lg sm:p-0"
+        >
           {RANGES.map((r) => (
             <button
+              type="button"
               key={r.value}
               onClick={() => setRange(r.value)}
-              className={`px-2.5 py-1 text-[11px] font-medium transition-colors ${
+              aria-pressed={range === r.value}
+              className={`min-h-10 rounded-lg px-3 py-1.5 text-[11px] font-medium transition-colors sm:min-h-0 sm:rounded-none sm:px-2.5 sm:py-1 ${
                 range === r.value
                   ? 'bg-accent text-white'
-                  : 'bg-surface-3 text-text-muted hover:text-text'
+                  : 'text-text-muted hover:bg-surface-3 hover:text-text'
               }`}
             >
               {r.label}
@@ -75,54 +81,58 @@ export default function TickerChart({ ticker, currency }) {
       </div>
 
       {loading ? (
-        <div className="h-[160px] flex items-center justify-center text-text-muted text-xs">
+        <div className="flex h-44 items-center justify-center text-xs text-text-muted sm:h-40">
           Loading chart...
         </div>
       ) : !data || data.length < 2 ? (
-        <div className="h-[160px] flex items-center justify-center text-text-muted text-xs">
+        <div className="flex h-44 items-center justify-center text-xs text-text-muted sm:h-40">
           No data available
         </div>
       ) : (
-        <ResponsiveContainer width="100%" height={160}>
-          <AreaChart data={data} margin={{ top: 5, right: 5, bottom: 0, left: 5 }}>
-            <defs>
-              <linearGradient id={`grad-${ticker}`} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor={isUp ? '#22c55e' : '#ef4444'} stopOpacity={0.3} />
-                <stop offset="100%" stopColor={isUp ? '#22c55e' : '#ef4444'} stopOpacity={0} />
-              </linearGradient>
-            </defs>
-            <XAxis
-              dataKey="date"
-              tick={{ fill: '#94a3b8', fontSize: 9 }}
-              axisLine={false}
-              tickLine={false}
-              interval={Math.max(0, Math.floor(data.length / 6) - 1)}
-              tickFormatter={(d) => {
-                const dt = new Date(d)
-                if (range === '1d') {
-                  return dt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
-                }
-                return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-              }}
-            />
-            <YAxis
-              domain={['auto', 'auto']}
-              tick={{ fill: '#94a3b8', fontSize: 9 }}
-              axisLine={false}
-              tickLine={false}
-              width={45}
-              tickFormatter={(v) => `${sym}${v}`}
-            />
-            <Tooltip content={<ChartTooltip sym={sym} intraday={range === '1d' || range === '1w'} />} />
-            <Area
-              type="monotone"
-              dataKey="close"
-              stroke={isUp ? '#22c55e' : '#ef4444'}
-              strokeWidth={1.5}
-              fill={`url(#grad-${ticker})`}
-            />
-          </AreaChart>
-        </ResponsiveContainer>
+        <div className="h-44 min-w-0 sm:h-40">
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={data} margin={{ top: 5, right: 2, bottom: 0, left: 0 }}>
+              <defs>
+                <linearGradient id={`grad-${ticker}`} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor={isUp ? '#22c55e' : '#ef4444'} stopOpacity={0.3} />
+                  <stop offset="100%" stopColor={isUp ? '#22c55e' : '#ef4444'} stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <XAxis
+                dataKey="date"
+                tick={{ fill: '#94a3b8', fontSize: 9 }}
+                axisLine={false}
+                tickLine={false}
+                interval="preserveStartEnd"
+                minTickGap={24}
+                tickMargin={6}
+                tickFormatter={(d) => {
+                  const dt = new Date(d)
+                  if (range === '1d') {
+                    return dt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+                  }
+                  return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                }}
+              />
+              <YAxis
+                domain={['auto', 'auto']}
+                tick={{ fill: '#94a3b8', fontSize: 9 }}
+                axisLine={false}
+                tickLine={false}
+                width={45}
+                tickFormatter={(v) => `${sym}${v}`}
+              />
+              <Tooltip content={<ChartTooltip sym={sym} intraday={range === '1d' || range === '1w'} />} />
+              <Area
+                type="monotone"
+                dataKey="close"
+                stroke={isUp ? '#22c55e' : '#ef4444'}
+                strokeWidth={1.5}
+                fill={`url(#grad-${ticker})`}
+              />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
       )}
     </div>
   )

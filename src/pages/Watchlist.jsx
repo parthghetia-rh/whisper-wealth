@@ -293,7 +293,7 @@ export default function Watchlist() {
       ) : (
         <>
           {/* Mobile: card view */}
-          <div className="md:hidden space-y-2.5">
+          <div className="space-y-2.5 lg:hidden">
             {refreshing && (
               <div className="flex items-center justify-center gap-2 py-2 text-accent">
                 <svg className="animate-spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
@@ -302,7 +302,7 @@ export default function Watchlist() {
                 <span className="text-xs">Refreshing...</span>
               </div>
             )}
-            <div className="flex items-center gap-2 mb-1">
+            <div className="mb-1 flex flex-wrap items-center gap-2">
               <span className="text-xs text-text-muted">Sort:</span>
               <select
                 value={sortKey || ''}
@@ -311,7 +311,7 @@ export default function Watchlist() {
                   setSortKey(key)
                   setSortDir(key === 'ticker' || key === 'name' ? 'asc' : 'desc')
                 }}
-                className="bg-surface-3 border border-border rounded-lg px-2 py-1.5 text-xs text-text outline-none"
+                className="min-w-0 flex-1 rounded-lg border border-border bg-surface-3 px-2 py-1.5 text-xs text-text outline-none sm:flex-none"
               >
                 <option value="">{customOrder ? 'Custom order' : 'Default'}</option>
                 <option value="change_percent">Day Change</option>
@@ -324,7 +324,7 @@ export default function Watchlist() {
               {sortKey && (
                 <button
                   onClick={() => setSortDir(sortDir === 'asc' ? 'desc' : 'asc')}
-                  className="flex items-center gap-1 text-xs text-text-muted hover:text-text px-2 py-1 bg-surface-3 border border-border rounded-lg"
+                  className="flex items-center gap-1 whitespace-nowrap rounded-lg border border-border bg-surface-3 px-2 py-1 text-xs text-text-muted hover:text-text"
                 >
                   {sortDir === 'asc' ? 'Low first' : 'High first'}
                   <svg width="8" height="10" viewBox="0 0 8 10" fill="currentColor" className="text-accent">
@@ -401,7 +401,7 @@ export default function Watchlist() {
           </div>
 
           {/* Desktop: table view */}
-          <div className="hidden md:block bg-surface-2 rounded-xl border border-border overflow-x-auto">
+          <div className="hidden overflow-x-auto rounded-xl border border-border bg-surface-2 lg:block">
             <table className="w-full text-sm min-w-[800px]">
               <thead>
                 <tr className="border-b border-border text-text-muted text-xs uppercase tracking-wider">
