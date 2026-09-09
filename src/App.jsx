@@ -9,6 +9,7 @@ import Watchlist from './pages/Watchlist'
 import Settings from './pages/Settings'
 import Milestones from './pages/Milestones'
 import Expenses from './pages/Expenses'
+import RealEstate from './pages/RealEstate'
 import Login from './pages/Login'
 import BiometricLock, { isBiometricEnabled } from './components/BiometricLock'
 import { HouseholdProvider } from './context/HouseholdContext'
@@ -38,6 +39,7 @@ export default function App() {
             <Route path="/dividends" element={<Dividends />} />
             <Route path="/cash" element={<Cash />} />
             <Route path="/expenses" element={<Expenses />} />
+            <Route path="/real-estate" element={<RealEstate />} />
             <Route path="/watchlist" element={<Watchlist />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/milestones" element={<Milestones />} />

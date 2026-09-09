@@ -34,7 +34,7 @@ if (existsSync(dbPath)) {
 db.run('PRAGMA foreign_keys = ON')
 
 const currentSchemaVersion = db.exec('PRAGMA user_version')[0]?.values?.[0]?.[0] || 0
-if (existsSync(dbPath) && currentSchemaVersion < 3) {
+if (existsSync(dbPath) && currentSchemaVersion < 4) {
   try {
     mkdirSync(backupDir, { recursive: true })
     const stamp = new Date().toISOString().replace(/[:.]/g, '-')
@@ -247,6 +247,36 @@ ensureColumn('transactions', 'member_id', 'INTEGER')
 ensureColumn('cash_positions', 'member_id', 'INTEGER')
 ensureColumn('expenses', 'member_id', 'INTEGER')
 
+db.run(`
+  CREATE TABLE IF NOT EXISTS properties (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    label TEXT NOT NULL,
+    address TEXT,
+    currency TEXT NOT NULL DEFAULT 'CAD',
+    purchase_price REAL NOT NULL DEFAULT 0,
+    purchase_date TEXT NOT NULL,
+    member_id INTEGER REFERENCES household_members(id) ON DELETE SET NULL,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now'))
+  )
+`)
+
+db.run(`
+  CREATE TABLE IF NOT EXISTS property_snapshots (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    property_id INTEGER NOT NULL REFERENCES properties(id) ON DELETE CASCADE,
+    valuation_date TEXT NOT NULL,
+    estimated_value REAL NOT NULL,
+    mortgage_balance REAL NOT NULL DEFAULT 0,
+    source_label TEXT NOT NULL DEFAULT 'Manual',
+    source_url TEXT,
+    note TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(property_id, valuation_date)
+  )
+`)
+
 const primaryMemberId = db.exec(
   'SELECT id FROM household_members WHERE is_primary = 1 ORDER BY id LIMIT 1'
 )[0]?.values?.[0]?.[0]
@@ -260,6 +290,8 @@ if (currentSchemaVersion < 3 && primaryMemberId) {
 db.run('CREATE INDEX IF NOT EXISTS idx_transactions_member ON transactions(member_id)')
 db.run('CREATE INDEX IF NOT EXISTS idx_cash_member ON cash_positions(member_id)')
 db.run('CREATE INDEX IF NOT EXISTS idx_expenses_member ON expenses(member_id)')
+db.run('CREATE INDEX IF NOT EXISTS idx_properties_member ON properties(member_id)')
+db.run('CREATE INDEX IF NOT EXISTS idx_property_snapshots_property_date ON property_snapshots(property_id, valuation_date)')
 
 db.run(`
   CREATE TABLE IF NOT EXISTS portfolio_snapshots_v3 (
@@ -486,7 +518,7 @@ function getDbHealth() {
   }
 }
 
-if (currentSchemaVersion < 3) db.run('PRAGMA user_version = 3')
+if (currentSchemaVersion < 4) db.run('PRAGMA user_version = 4')
 saveNow()
 
 export {
