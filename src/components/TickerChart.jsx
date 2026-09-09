@@ -41,8 +41,8 @@ export default function TickerChart({ ticker, currency }) {
       : '0.00'
 
   return (
-    <div className="bg-surface-3/50 p-3 sm:p-4">
-      <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+    <div className="min-w-0 overflow-hidden bg-surface-3/50 p-3 sm:p-4">
+      <div className="mb-3 flex min-w-0 flex-col gap-3 lg:flex-row lg:items-center lg:justify-between lg:gap-4">
         <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
           <span className="text-sm font-medium">{ticker}</span>
           {data && data.length > 1 && (
@@ -60,7 +60,7 @@ export default function TickerChart({ ticker, currency }) {
         <div
           role="group"
           aria-label={`${ticker} chart period`}
-          className="grid w-full grid-cols-3 gap-1 rounded-xl border border-border bg-surface-2/70 p-1 sm:flex sm:w-auto sm:shrink-0 sm:gap-0 sm:overflow-hidden sm:rounded-lg sm:p-0"
+          className="grid min-w-0 w-full grid-cols-3 gap-1 overflow-hidden rounded-xl border border-border bg-surface-2/70 p-1 lg:flex lg:w-auto lg:shrink-0 lg:gap-0 lg:rounded-lg lg:p-0"
         >
           {RANGES.map((r) => (
             <button
@@ -68,7 +68,7 @@ export default function TickerChart({ ticker, currency }) {
               key={r.value}
               onClick={() => setRange(r.value)}
               aria-pressed={range === r.value}
-              className={`min-h-10 rounded-lg px-3 py-1.5 text-[11px] font-medium transition-colors sm:min-h-0 sm:rounded-none sm:px-2.5 sm:py-1 ${
+              className={`min-h-10 min-w-0 rounded-lg px-3 py-1.5 text-[11px] font-medium transition-colors lg:min-h-0 lg:rounded-none lg:px-2.5 lg:py-1 ${
                 range === r.value
                   ? 'bg-accent text-white'
                   : 'text-text-muted hover:bg-surface-3 hover:text-text'
