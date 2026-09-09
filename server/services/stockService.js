@@ -237,6 +237,10 @@ export function chartOptionsForRange(range, now = new Date()) {
     start.setDate(start.getDate() - 7)
     return { period1: start, period2: now, interval: '5m', includePrePost: true }
   }
+  if (range === '1w') {
+    start.setDate(start.getDate() - 7)
+    return { period1: start, period2: now, interval: '1h', includePrePost: true }
+  }
   const months = { '1m': 1, '3m': 3, '6m': 6, '1y': 12 }[range] || 12
   start.setMonth(start.getMonth() - months)
   return { period1: start, period2: now, interval: months <= 3 ? '1d' : '1wk' }
@@ -252,9 +256,10 @@ function marketDate(date, timeZone) {
 
 export function normalizeChartData(result, range) {
   const intraday = range === '1d'
+  const timestamped = intraday || range === '1w'
   const timeZone = result.meta?.exchangeTimezoneName || 'America/New_York'
   let data = (result.quotes || []).map((q) => ({
-    date: intraday ? q.date?.toISOString() : q.date?.toISOString().split('T')[0],
+    date: timestamped ? q.date?.toISOString() : q.date?.toISOString().split('T')[0],
     marketDate: q.date ? marketDate(q.date, timeZone) : null,
     close: Math.round((q.close ?? 0) * 100) / 100,
   })).filter((q) => q.date && q.close > 0)

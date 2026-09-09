@@ -57,6 +57,24 @@ test('one-day charts use intraday data from only the latest market session', () 
   ])
 })
 
+test('one-week charts use hourly data across the full seven-day window', () => {
+  const now = new Date('2026-09-09T18:00:00Z')
+  const options = chartOptionsForRange('1w', now)
+  assert.equal(options.interval, '1h')
+  assert.equal(options.includePrePost, true)
+  assert.equal(now.getTime() - options.period1.getTime(), 7 * 24 * 60 * 60 * 1000)
+
+  const data = normalizeChartData({
+    meta: { exchangeTimezoneName: 'America/New_York' },
+    quotes: [
+      { date: new Date('2026-09-08T14:00:00Z'), close: 100 },
+      { date: new Date('2026-09-09T14:00:00Z'), close: 102 },
+    ],
+  }, '1w')
+  assert.equal(data.length, 2)
+  assert.equal(data[0].date, '2026-09-08T14:00:00.000Z')
+})
+
 test('request budget blocks starts beyond its window limit', async () => {
   const budget = new RequestBudget(2, 50)
   await budget.acquire()
