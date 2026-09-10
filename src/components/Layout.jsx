@@ -3,6 +3,7 @@ import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { themes, getStoredTheme, applyTheme } from '../utils/themes'
 import NotificationBell from './NotificationBell'
 import { useHousehold } from '../context/HouseholdContext'
+import ActionSheet from './ActionSheet'
 
 const DEFAULT_NAV = [
   { to: '/', label: 'Dashboard', icon: 'dashboard', short: 'Home' },
@@ -12,6 +13,7 @@ const DEFAULT_NAV = [
   { to: '/expenses', label: 'Expenses', icon: 'expenses', short: 'Bills' },
   { to: '/real-estate', label: 'Real Estate', icon: 'property', short: 'Homes' },
   { to: '/watchlist', label: 'Watchlist', icon: 'watchlist', short: 'Watch' },
+  { to: '/milestones', label: 'Milestones', icon: 'milestone', short: 'Goals' },
 ]
 
 const ICONS = {
@@ -22,10 +24,18 @@ const ICONS = {
   property: PropertyIcon,
   cash: CashIcon,
   watchlist: WatchlistIcon,
+  milestone: MilestoneIcon,
 }
 
 const NAV_ORDER_KEY = 'folio-nav-order'
 const SIDEBAR_KEY = 'folio-sidebar-collapsed'
+export const MOBILE_PRIMARY_PATHS = ['/', '/transactions', '/dividends', '/watchlist']
+const MOBILE_PRIMARY_NAV = DEFAULT_NAV.filter((item) => MOBILE_PRIMARY_PATHS.includes(item.to))
+const MOBILE_MORE_NAV = DEFAULT_NAV.filter((item) => !MOBILE_PRIMARY_PATHS.includes(item.to))
+
+export function isMobileMoreRoute(pathname) {
+  return MOBILE_MORE_NAV.some((item) => item.to === pathname) || pathname === '/settings'
+}
 
 function getStoredOrder() {
   try {
@@ -33,11 +43,8 @@ function getStoredOrder() {
     if (!saved) return null
     const order = JSON.parse(saved)
     const defaultPaths = DEFAULT_NAV.map((n) => n.to)
-    if (
-      order.length === defaultPaths.length &&
-      order.every((p) => defaultPaths.includes(p))
-    ) {
-      return order
+    if (Array.isArray(order) && order.every((path) => defaultPaths.includes(path))) {
+      return [...order, ...defaultPaths.filter((path) => !order.includes(path))]
     }
   } catch {}
   return null
@@ -53,7 +60,7 @@ export default function Layout({ onLogout }) {
   const { scope, setScope, members } = useHousehold()
   const [currentTheme, setCurrentTheme] = useState(getStoredTheme)
   const [themeOpen, setThemeOpen] = useState(false)
-  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem(SIDEBAR_KEY) === 'true')
   const [navItems, setNavItems] = useState(getOrderedNav)
   const [dragIdx, setDragIdx] = useState(null)
@@ -66,7 +73,7 @@ export default function Layout({ onLogout }) {
   }, [currentTheme])
 
   useEffect(() => {
-    setSettingsOpen(false)
+    setMobileMenuOpen(false)
   }, [location.pathname])
 
   const toggleCollapse = () => {
@@ -333,82 +340,92 @@ export default function Layout({ onLogout }) {
             <Logo size={24} />
             <span className="truncate text-sm font-semibold text-text">WhisperWealth</span>
           </NavLink>
-          <div className="ml-auto flex shrink-0 items-center gap-2">
+          <div className="ml-auto flex shrink-0 items-center gap-1">
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg hover:bg-surface-3">
               <NotificationBell />
             </div>
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => setThemeOpen((open) => !open)}
-                aria-label="Choose theme"
-                aria-expanded={themeOpen}
-                aria-controls="mobile-theme-menu"
-                className={`relative flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors ${
-                  themeOpen
-                    ? 'bg-accent/15 text-accent-hover'
-                    : 'text-text-muted hover:bg-surface-3 hover:text-text'
-                }`}
-              >
-                <ThemeIcon />
-                <span
-                  className="absolute bottom-1 right-1 h-2.5 w-2.5 rounded-full border-2 border-surface-2"
-                  style={{ backgroundColor: themes[currentTheme]?.swatch }}
-                />
-              </button>
-              {themeOpen && (
-                <div
-                  id="mobile-theme-menu"
-                  className="absolute right-0 top-full z-[110] mt-2 w-64 rounded-xl border border-border bg-surface-2 p-2 shadow-xl"
-                >
-                  <p className="px-2 pb-1.5 text-[10px] font-medium uppercase tracking-wider text-text-muted">
-                    Choose theme
-                  </p>
-                  <div className="grid grid-cols-2 gap-1">
-                    {Object.entries(themes).map(([id, theme]) => (
-                      <button
-                        type="button"
-                        key={id}
-                        onClick={() => {
-                          setCurrentTheme(id)
-                          setThemeOpen(false)
-                        }}
-                        aria-pressed={currentTheme === id}
-                        className={`flex items-center gap-2 rounded-lg px-2 py-2 text-left text-xs transition-colors ${
-                          currentTheme === id
-                            ? 'bg-accent/15 font-medium text-accent-hover'
-                            : 'text-text-muted hover:bg-surface-3 hover:text-text'
-                        }`}
-                      >
-                        <span
-                          className="h-3.5 w-3.5 shrink-0 rounded-full border border-border"
-                          style={{ backgroundColor: theme.swatch }}
-                        />
-                        <span className="truncate">{theme.label}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-            <NavLink
-              to="/settings"
-              aria-label="Settings"
-              title="Settings"
-              className={({ isActive }) =>
-                `flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors ${
-                  isActive
-                    ? 'bg-accent/15 text-accent-hover'
-                    : 'text-text-muted hover:bg-surface-3 hover:text-text'
-                }`
-              }
+            <button
+              type="button"
+              onClick={() => setMobileMenuOpen(true)}
+              aria-label="Open portfolio menu"
+              aria-expanded={mobileMenuOpen}
+              className={`relative flex h-11 w-11 shrink-0 items-center justify-center rounded-lg transition-colors ${
+                mobileMenuOpen ? 'bg-accent/15 text-accent-hover' : 'text-text-muted hover:bg-surface-3 hover:text-text'
+              }`}
             >
-              <SettingsIcon size={20} />
-            </NavLink>
+              <MenuIcon />
+              <span className="absolute bottom-1.5 right-1.5 h-2.5 w-2.5 rounded-full border-2 border-surface-2" style={{ backgroundColor: themes[currentTheme]?.swatch }} />
+            </button>
           </div>
         </div>
 
-        <div className="flex items-center justify-between gap-3 px-4 md:px-6 py-2 bg-surface-2/60 border-b border-border">
+        <ActionSheet
+          open={mobileMenuOpen}
+          onClose={() => setMobileMenuOpen(false)}
+          title="Portfolio menu"
+          description="Switch views, open more sections, or change the appearance."
+          size="lg"
+        >
+          <div className="space-y-5">
+            <label className="block">
+              <span className="mb-1.5 block text-xs font-medium text-text-muted">Portfolio view</span>
+              <select
+                value={scope}
+                onChange={(event) => setScope(event.target.value)}
+                className="min-h-11 w-full rounded-lg border border-border bg-surface-3 px-3 text-sm text-text outline-none focus:border-accent"
+              >
+                <option value="household">Combined household</option>
+                <option value="shared">Shared</option>
+                {members.map((member) => <option key={member.id} value={member.scope}>{member.name}</option>)}
+              </select>
+            </label>
+
+            <div>
+              <p className="mb-2 text-xs font-medium text-text-muted">More sections</p>
+              <div className="grid grid-cols-2 gap-2">
+                {MOBILE_MORE_NAV.map(({ to, label, icon }) => {
+                  const Icon = ICONS[icon]
+                  return (
+                    <NavLink key={to} to={to} className={({ isActive }) => `flex min-h-12 items-center gap-3 rounded-xl border px-3 text-sm ${isActive ? 'border-accent/40 bg-accent/10 text-accent-hover' : 'border-border bg-surface-3/50 text-text hover:bg-surface-3'}`}>
+                      <Icon />
+                      {label}
+                    </NavLink>
+                  )
+                })}
+                <NavLink to="/settings" className={({ isActive }) => `flex min-h-12 items-center gap-3 rounded-xl border px-3 text-sm ${isActive ? 'border-accent/40 bg-accent/10 text-accent-hover' : 'border-border bg-surface-3/50 text-text hover:bg-surface-3'}`}>
+                  <SettingsIcon />
+                  Settings
+                </NavLink>
+              </div>
+            </div>
+
+            <div>
+              <p className="mb-2 text-xs font-medium text-text-muted">Appearance</p>
+              <div className="grid grid-cols-2 gap-2">
+                {Object.entries(themes).map(([id, theme]) => (
+                  <button
+                    type="button"
+                    key={id}
+                    onClick={() => setCurrentTheme(id)}
+                    aria-pressed={currentTheme === id}
+                    className={`flex min-h-11 items-center gap-2.5 rounded-xl border px-3 text-left text-sm transition-colors ${currentTheme === id ? 'border-accent/40 bg-accent/10 text-accent-hover' : 'border-border bg-surface-3/50 text-text-muted hover:text-text'}`}
+                  >
+                    <span className="h-4 w-4 shrink-0 rounded-full border border-border" style={{ backgroundColor: theme.swatch }} />
+                    {theme.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {onLogout && (
+              <button type="button" onClick={onLogout} className="min-h-11 w-full rounded-xl border border-red/20 bg-red/5 px-4 text-sm font-medium text-red hover:bg-red/10">
+                Log out
+              </button>
+            )}
+          </div>
+        </ActionSheet>
+
+        <div className="hidden items-center justify-between gap-3 border-b border-border bg-surface-2/60 px-6 py-2 md:flex">
           <span className="text-[10px] uppercase tracking-wider text-text-muted">Portfolio view</span>
           <select
             value={scope}
@@ -421,14 +438,14 @@ export default function Layout({ onLogout }) {
           </select>
         </div>
 
-        <main className="flex-1 overflow-auto p-4 md:p-6 pb-20 md:pb-6">
+        <main className="flex-1 overflow-auto p-4 pb-24 md:p-6 md:pb-6">
           <Outlet />
         </main>
 
         {/* Mobile bottom tab bar */}
         <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-surface-2 border-t border-border z-40">
-          <div className="flex">
-            {navItems.map(({ to, short, icon }) => {
+          <div className="grid grid-cols-5">
+            {MOBILE_PRIMARY_NAV.map(({ to, short, icon }) => {
               const Icon = ICONS[icon]
               return (
                 <NavLink
@@ -436,7 +453,7 @@ export default function Layout({ onLogout }) {
                   to={to}
                   end={to === '/'}
                   className={({ isActive }) =>
-                    `flex-1 flex flex-col items-center gap-0.5 py-2.5 text-[10px] transition-colors ${
+                    `flex min-h-14 flex-col items-center justify-center gap-1 py-1.5 text-[11px] transition-colors ${
                       isActive ? 'text-accent-hover' : 'text-text-muted'
                     }`
                   }
@@ -446,6 +463,19 @@ export default function Layout({ onLogout }) {
                 </NavLink>
               )
             })}
+            <button
+              type="button"
+              onClick={() => setMobileMenuOpen(true)}
+              className={`flex min-h-14 flex-col items-center justify-center gap-1 py-1.5 text-[11px] transition-colors ${
+                isMobileMoreRoute(location.pathname)
+                  ? 'text-accent-hover'
+                  : 'text-text-muted'
+              }`}
+              aria-label="Open more sections"
+            >
+              <MoreIcon />
+              More
+            </button>
           </div>
           <div className="h-[env(safe-area-inset-bottom)]" />
         </nav>
@@ -521,6 +551,34 @@ function ThemeIcon() {
       <circle cx="10" cy="7" r=".75" fill="currentColor" stroke="none" />
       <circle cx="14.5" cy="7" r=".75" fill="currentColor" stroke="none" />
       <circle cx="17" cy="10.5" r=".75" fill="currentColor" stroke="none" />
+    </svg>
+  )
+}
+
+function MenuIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
+      <circle cx="10" cy="10" r="7" />
+      <path d="M7 8h6M7 12h6" />
+    </svg>
+  )
+}
+
+function MoreIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <rect x="2" y="2" width="5" height="5" rx="1" />
+      <rect x="11" y="2" width="5" height="5" rx="1" />
+      <rect x="2" y="11" width="5" height="5" rx="1" />
+      <rect x="11" y="11" width="5" height="5" rx="1" />
+    </svg>
+  )
+}
+
+function MilestoneIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M8 1.5l1.8 3.7 4.1.6-3 2.9.7 4.1L8 10.9l-3.6 1.9.7-4.1-3-2.9 4.1-.6L8 1.5z" />
     </svg>
   )
 }

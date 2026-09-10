@@ -27,8 +27,8 @@ export default function Dashboard() {
   }
 
   const v = (val) => showValues ? val : HIDDEN
-  const { data: summary, refetch: refetchSummary } = useApi(scopedUrl('/api/portfolio/summary'))
-  const { data: holdings, refetch: refetchHoldings } = useApi(scopedUrl('/api/portfolio'))
+  const { data: summary, loading: summaryLoading, refetch: refetchSummary } = useApi(scopedUrl('/api/portfolio/summary'))
+  const { data: holdings, loading: holdingsLoading, refetch: refetchHoldings } = useApi(scopedUrl('/api/portfolio'))
   const { data: ratesData, refetch: refetchRates } = useApi('/api/portfolio/rates')
 
   const refetchAll = () => {
@@ -91,7 +91,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {currencies.length === 0 && !holdings?.length && (
+      {!summaryLoading && !holdingsLoading && currencies.length === 0 && !holdings?.length && (
         <WelcomeBanner />
       )}
 

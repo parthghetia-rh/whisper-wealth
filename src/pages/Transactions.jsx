@@ -1,24 +1,48 @@
 import { useState } from 'react'
-import { useApi, deleteApi, putApi } from '../hooks/useApi'
+import { useApi, deleteApi, postApi, putApi } from '../hooks/useApi'
 import TransactionForm from '../components/TransactionForm'
 import CSVImport from '../components/CSVImport'
 import { useHousehold } from '../context/HouseholdContext'
 import OwnerSelect, { OwnerBadge } from '../components/OwnerSelect'
+import ActionSheet from '../components/ActionSheet'
+import { notify } from '../components/ToastViewport'
+import RecordListSkeleton from '../components/RecordListSkeleton'
 
 export default function Transactions() {
   const { scopedUrl } = useHousehold()
-  const { data: transactions, refetch } = useApi(scopedUrl('/api/transactions'))
+  const { data: transactions, loading: transactionsLoading, refetch } = useApi(scopedUrl('/api/transactions'))
   const [editingId, setEditingId] = useState(null)
   const [editForm, setEditForm] = useState(null)
   const [editError, setEditError] = useState(null)
   const [saving, setSaving] = useState(false)
+  const [formOpen, setFormOpen] = useState(false)
 
-  const handleDelete = async (id) => {
+  const handleDelete = async (transaction) => {
     try {
-      await deleteApi(`/api/transactions/${id}`)
+      await deleteApi(`/api/transactions/${transaction.id}`)
       refetch()
+      notify(`${transaction.ticker} transaction deleted`, {
+        tone: 'info',
+        actionLabel: 'Undo',
+        onAction: async () => {
+          try {
+            await postApi('/api/transactions', {
+              ticker: transaction.ticker,
+              type: transaction.type,
+              shares: transaction.shares,
+              price_per_share: transaction.price_per_share,
+              date: transaction.date,
+              owner_scope: transaction.owner_scope,
+            })
+            refetch()
+            notify('Transaction restored')
+          } catch (err) {
+            notify(err.message, { tone: 'error' })
+          }
+        },
+      })
     } catch (err) {
-      console.error('Delete failed:', err)
+      notify(err.message, { tone: 'error' })
     }
   }
 
@@ -53,6 +77,7 @@ export default function Transactions() {
       setEditingId(null)
       setEditForm(null)
       refetch()
+      notify('Transaction updated')
     } catch (err) {
       setEditError(err.message)
     } finally {
@@ -67,31 +92,60 @@ export default function Transactions() {
 
   return (
     <div className="space-y-6 max-w-6xl">
-      <div>
-        <h2 className="text-xl font-semibold">Transactions</h2>
-        <p className="text-sm text-text-muted mt-0.5">
-          Add and manage your buy/sell transactions
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-xl font-semibold">Transactions</h2>
+          <p className="mt-0.5 text-sm text-text-muted">Add and manage your buy/sell transactions</p>
+        </div>
+        <button type="button" onClick={() => setFormOpen(true)} className="min-h-11 rounded-lg bg-accent px-4 text-sm font-medium text-white hover:bg-accent-hover">
+          Add transaction
+        </button>
       </div>
 
-      <TransactionForm onAdded={refetch} />
+      <ActionSheet open={formOpen} onClose={() => setFormOpen(false)} title="Add transaction" description="Record a buy or sell for a household member.">
+        <TransactionForm
+          embedded
+          onAdded={() => {
+            refetch()
+            setFormOpen(false)
+            notify('Transaction added')
+          }}
+        />
+      </ActionSheet>
 
       <CSVImport onImported={refetch} />
 
       <div>
         <h3 className="text-sm font-medium text-text-muted mb-3">History</h3>
-        {!transactions?.length ? (
+        {transactionsLoading ? (
+          <RecordListSkeleton />
+        ) : !transactions?.length ? (
           <div className="bg-surface-2 rounded-xl border border-border p-8 text-center text-text-muted">
             No transactions yet.
           </div>
         ) : (
-          <div className="bg-surface-2 rounded-xl border border-border overflow-x-auto">
+          <>
             {editError && (
-              <div className="text-red text-xs bg-red/10 px-4 py-2">
+              <div className="mb-2 rounded-lg bg-red/10 px-4 py-2 text-xs text-red">
                 {editError}
               </div>
             )}
-            <table className="w-full text-sm min-w-[650px]">
+            <div className="space-y-2 md:hidden">
+              {transactions.map((transaction) => editingId === transaction.id ? (
+                <MobileTransactionEditor
+                  key={transaction.id}
+                  form={editForm}
+                  setForm={setEditForm}
+                  saving={saving}
+                  onSave={saveEdit}
+                  onCancel={cancelEdit}
+                />
+              ) : (
+                <MobileTransactionCard key={transaction.id} transaction={transaction} onEdit={() => startEdit(transaction)} onDelete={() => handleDelete(transaction)} />
+              ))}
+            </div>
+            <div className="hidden overflow-x-auto rounded-xl border border-border bg-surface-2 md:block">
+            <table className="w-full min-w-[650px] text-sm">
               <thead>
                 <tr className="border-b border-border text-text-muted text-xs uppercase tracking-wider">
                   <th className="text-left p-3 pl-4">Date</th>
@@ -264,8 +318,8 @@ export default function Transactions() {
                             <EditIcon />
                           </button>
                           <button
-                            onClick={() => handleDelete(t.id)}
-                            className="text-text-muted hover:text-red transition-colors p-1"
+                            onClick={() => handleDelete(t)}
+                            className="icon-button"
                             title="Delete transaction"
                           >
                             <TrashIcon />
@@ -278,9 +332,64 @@ export default function Transactions() {
               </tbody>
             </table>
           </div>
+          </>
         )}
       </div>
     </div>
+  )
+}
+
+export function MobileTransactionCard({ transaction, onEdit, onDelete }) {
+  const total = transaction.shares * transaction.price_per_share
+  const isBuy = transaction.type === 'buy'
+  return (
+    <article className="rounded-xl border border-border bg-surface-2 p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-base font-semibold">{transaction.ticker}</span>
+            <span className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs font-medium ${isBuy ? 'bg-green/15 text-green' : 'bg-red/15 text-red'}`}>
+              <span aria-hidden="true">{isBuy ? '↑' : '↓'}</span>
+              {transaction.type.toUpperCase()}
+            </span>
+            <OwnerBadge name={transaction.owner_name} color={transaction.owner_color} />
+          </div>
+          <p className="mt-1 text-xs tabular-nums text-text-muted">{transaction.date}</p>
+        </div>
+        <div className="flex shrink-0">
+          <button type="button" onClick={onEdit} className="icon-button" aria-label={`Edit ${transaction.ticker} transaction`}><EditIcon /></button>
+          <button type="button" onClick={onDelete} className="icon-button hover:!bg-red/10 hover:!text-red" aria-label={`Delete ${transaction.ticker} transaction`}><TrashIcon /></button>
+        </div>
+      </div>
+      <dl className="mt-4 grid grid-cols-3 gap-3 border-t border-border/50 pt-3 text-xs">
+        <div><dt className="text-text-muted">Shares</dt><dd className="mt-1 font-medium tabular-nums">{transaction.shares}</dd></div>
+        <div><dt className="text-text-muted">Price</dt><dd className="mt-1 font-medium tabular-nums">${transaction.price_per_share.toFixed(2)}</dd></div>
+        <div className="text-right"><dt className="text-text-muted">Total</dt><dd className="mt-1 font-semibold tabular-nums">${total.toLocaleString('en-US', { minimumFractionDigits: 2 })}</dd></div>
+      </dl>
+    </article>
+  )
+}
+
+function MobileTransactionEditor({ form, setForm, saving, onSave, onCancel }) {
+  const update = (key, value) => setForm((current) => ({ ...current, [key]: value }))
+  return (
+    <article className="space-y-3 rounded-xl border border-accent/40 bg-accent/5 p-4">
+      <div className="grid grid-cols-2 gap-3">
+        <label className="col-span-2"><span className="mb-1 block text-xs text-text-muted">Ticker</span><input value={form.ticker} onChange={(event) => update('ticker', event.target.value.toUpperCase())} className="min-h-11 w-full rounded-lg border border-border bg-surface-3 px-3 text-sm" /></label>
+        <label><span className="mb-1 block text-xs text-text-muted">Date</span><input type="date" value={form.date} onChange={(event) => update('date', event.target.value)} className="min-h-11 w-full rounded-lg border border-border bg-surface-3 px-3 text-sm" /></label>
+        <OwnerSelect value={form.owner_scope} onChange={(owner_scope) => update('owner_scope', owner_scope)} includeLabel />
+        <label><span className="mb-1 block text-xs text-text-muted">Shares</span><input type="number" step="any" min="0.0001" value={form.shares} onChange={(event) => update('shares', event.target.value)} className="min-h-11 w-full rounded-lg border border-border bg-surface-3 px-3 text-sm" /></label>
+        <label><span className="mb-1 block text-xs text-text-muted">Price</span><input type="number" step="any" min="0.01" value={form.price_per_share} onChange={(event) => update('price_per_share', event.target.value)} className="min-h-11 w-full rounded-lg border border-border bg-surface-3 px-3 text-sm" /></label>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <button type="button" onClick={() => update('type', 'buy')} className={`min-h-11 rounded-lg text-sm font-medium ${form.type === 'buy' ? 'bg-green/15 text-green' : 'bg-surface-3 text-text-muted'}`}>↑ Buy</button>
+        <button type="button" onClick={() => update('type', 'sell')} className={`min-h-11 rounded-lg text-sm font-medium ${form.type === 'sell' ? 'bg-red/15 text-red' : 'bg-surface-3 text-text-muted'}`}>↓ Sell</button>
+      </div>
+      <div className="flex justify-end gap-2">
+        <button type="button" onClick={onCancel} className="min-h-11 rounded-lg px-4 text-sm text-text-muted hover:bg-surface-3">Cancel</button>
+        <button type="button" onClick={onSave} disabled={saving} className="min-h-11 rounded-lg bg-accent px-4 text-sm font-medium text-white disabled:opacity-50">{saving ? 'Saving…' : 'Save'}</button>
+      </div>
+    </article>
   )
 }
 

@@ -60,9 +60,10 @@ export default function PortfolioHistory({ displayCurrency, mode, onClose }) {
   const changePct = first !== 0 ? ((change / Math.abs(first)) * 100).toFixed(2) : '0.00'
 
   return (
-    <div className="bg-surface-2 rounded-xl border border-border p-5 space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
+    <div className="min-w-0 space-y-4 overflow-hidden rounded-xl border border-border bg-surface-2 p-4 sm:p-5">
+      <div className="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+        <div className="flex min-w-0 items-start justify-between gap-3">
+          <div>
           <h3 className="text-sm font-medium">{label} History</h3>
           {data && data.length > 1 && (
             <p className={`text-xs tabular-nums mt-0.5 ${isUp ? 'text-green' : 'text-red'}`}>
@@ -70,9 +71,13 @@ export default function PortfolioHistory({ displayCurrency, mode, onClose }) {
               {' '}since {formatSnapshotDate(data[0].date, { year: 'numeric' })}
             </p>
           )}
+          </div>
+          <button type="button" onClick={onClose} className="icon-button -mr-2 -mt-2 lg:hidden" aria-label={`Close ${label} history`}>
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M4 4l6 6M10 4l-6 6" /></svg>
+          </button>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="flex rounded-lg border border-border overflow-hidden">
+        <div className="flex min-w-0 items-center gap-2">
+          <div className="grid w-full grid-cols-4 gap-1 rounded-xl border border-border bg-surface-3/50 p-1 lg:flex lg:w-auto lg:gap-0 lg:overflow-hidden lg:rounded-lg lg:p-0" role="group" aria-label={`${label} period`}>
             {RANGES.map((r) => {
               const available = !meta?.available_ranges || meta.available_ranges.includes(r.value)
               const unlockDate = meta?.range_unlocks?.[r.value]
@@ -82,10 +87,11 @@ export default function PortfolioHistory({ displayCurrency, mode, onClose }) {
                   type="button"
                   disabled={!available}
                   onClick={() => setRange(r.value)}
+                  aria-pressed={range === r.value}
                   title={available
                     ? `${r.label} history`
                     : `Available ${formatSnapshotDate(unlockDate, { year: 'numeric' })}`}
-                  className={`px-2.5 py-1 text-[11px] font-medium transition-colors ${
+                  className={`min-h-10 rounded-lg px-2.5 py-1 text-xs font-medium transition-colors lg:min-h-0 lg:rounded-none lg:text-[11px] ${
                     range === r.value
                       ? 'bg-accent text-white'
                       : available
@@ -98,7 +104,7 @@ export default function PortfolioHistory({ displayCurrency, mode, onClose }) {
               )
             })}
           </div>
-          <button onClick={onClose} className="p-1 text-text-muted hover:text-text">
+          <button type="button" onClick={onClose} className="icon-button hidden lg:inline-flex" aria-label={`Close ${label} history`}>
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
               <path d="M4 4l6 6M10 4l-6 6" />
             </svg>
@@ -119,8 +125,9 @@ export default function PortfolioHistory({ displayCurrency, mode, onClose }) {
           Not enough data
         </div>
       ) : (
-        <ResponsiveContainer width="100%" height={200}>
-          <AreaChart data={data} margin={{ top: 5, right: 5, bottom: 0, left: 5 }}>
+        <div className="h-[220px] min-w-0 sm:h-[200px]">
+        <ResponsiveContainer width="100%" height="100%">
+          <AreaChart data={data} margin={{ top: 5, right: 2, bottom: 0, left: 0 }}>
             <defs>
               <linearGradient id="portfolioGrad" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor={isUp ? '#22c55e' : '#ef4444'} stopOpacity={0.3} />
@@ -132,7 +139,9 @@ export default function PortfolioHistory({ displayCurrency, mode, onClose }) {
               tick={{ fill: '#94a3b8', fontSize: 9 }}
               axisLine={false}
               tickLine={false}
-              interval={Math.max(0, Math.floor(data.length / 6) - 1)}
+              interval="preserveStartEnd"
+              minTickGap={24}
+              tickMargin={6}
               tickFormatter={(date) => formatSnapshotDate(date)}
             />
             <YAxis
@@ -166,6 +175,7 @@ export default function PortfolioHistory({ displayCurrency, mode, onClose }) {
             )}
           </AreaChart>
         </ResponsiveContainer>
+        </div>
       )}
       {!loading && !error && data?.length > 0 && (
         <div className="space-y-1 text-[10px] text-text-muted/70">

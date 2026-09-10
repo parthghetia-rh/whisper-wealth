@@ -29,7 +29,17 @@ export default function PerformanceTracker({ displayCurrency, showValues, combin
     <div className="space-y-4">
       <div
         onClick={() => setShowChart(!showChart)}
-        className="bg-surface-2/80 backdrop-blur-sm rounded-2xl border border-border/60 p-6 cursor-pointer hover:border-accent/40 transition-all duration-200"
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault()
+            setShowChart(!showChart)
+          }
+        }}
+        role="button"
+        tabIndex={0}
+        aria-expanded={showChart}
+        aria-label={`${showChart ? 'Hide' : 'Show'} portfolio value history`}
+        className="cursor-pointer rounded-2xl border border-border/60 bg-surface-2/80 p-4 backdrop-blur-sm transition-all duration-200 hover:border-accent/40 sm:p-6"
       >
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-5">
           <div className="flex-1">
@@ -43,12 +53,12 @@ export default function PerformanceTracker({ displayCurrency, showValues, combin
             </p>
           </div>
 
-          <div className="flex gap-4 md:gap-5 flex-wrap">
+          <div className="grid w-full grid-cols-2 gap-2 md:w-auto md:flex md:flex-wrap md:gap-4 lg:gap-5">
             {dayGain && (
               <div className="text-right bg-surface-3/30 rounded-lg px-3 py-2">
                 <p className="text-[9px] text-text-muted uppercase tracking-widest mb-1">Today</p>
                 <p className={`text-base font-bold tabular-nums ${dayUp ? 'text-green' : 'text-red'}`}>
-                  {v(`${dayUp ? '+' : ''}${formatCurrency(dayGain.value, displayCurrency)}`)}
+                  <span aria-hidden="true">{dayUp ? '↑ ' : '↓ '}</span>{v(`${dayUp ? '+' : ''}${formatCurrency(dayGain.value, displayCurrency)}`)}
                 </p>
                 <p className={`text-[10px] tabular-nums mt-0.5 ${dayUp ? 'text-green/60' : 'text-red/60'}`}>
                   {dayUp ? '+' : ''}{dayGain.percent.toFixed(2)}%
@@ -60,7 +70,7 @@ export default function PerformanceTracker({ displayCurrency, showValues, combin
               <div className="text-right bg-surface-3/30 rounded-lg px-3 py-2">
                 <p className="text-[9px] text-text-muted uppercase tracking-widest mb-1">Week</p>
                 <p className={`text-base font-bold tabular-nums ${weekUp ? 'text-green' : 'text-red'}`}>
-                  {v(`${weekUp ? '+' : ''}${formatCurrency(weekGain.value, displayCurrency)}`)}
+                  <span aria-hidden="true">{weekUp ? '↑ ' : '↓ '}</span>{v(`${weekUp ? '+' : ''}${formatCurrency(weekGain.value, displayCurrency)}`)}
                 </p>
                 <p className={`text-[10px] tabular-nums mt-0.5 ${weekUp ? 'text-green/60' : 'text-red/60'}`}>
                   {weekUp ? '+' : ''}{weekGain.percent.toFixed(2)}%
@@ -71,16 +81,16 @@ export default function PerformanceTracker({ displayCurrency, showValues, combin
             <div className="text-right bg-surface-3/30 rounded-lg px-3 py-2">
               <p className="text-[9px] text-text-muted uppercase tracking-widest mb-1">Total</p>
               <p className={`text-base font-bold tabular-nums ${totalUp ? 'text-green' : 'text-red'}`}>
-                {v(`${totalUp ? '+' : ''}${formatCurrency(totalGain, displayCurrency)}`)}
+                <span aria-hidden="true">{totalUp ? '↑ ' : '↓ '}</span>{v(`${totalUp ? '+' : ''}${formatCurrency(totalGain, displayCurrency)}`)}
               </p>
               <p className={`text-[10px] tabular-nums mt-0.5 ${totalUp ? 'text-green/60' : 'text-red/60'}`}>
                 {totalUp ? '+' : ''}{totalGainPct.toFixed(2)}%
               </p>
             </div>
 
-            <div className="text-right">
-              <p className="text-[10px] text-text-muted uppercase tracking-wider mb-0.5">Yield</p>
-              <p className="text-sm font-semibold tabular-nums text-green">
+            <div className="rounded-lg bg-surface-3/30 px-3 py-2 text-right">
+              <p className="mb-1 text-[10px] uppercase tracking-widest text-text-muted">Yield</p>
+              <p className="text-base font-bold tabular-nums text-green">
                 {combined.yield > 0 ? `${combined.yield.toFixed(2)}%` : '—'}
               </p>
             </div>
@@ -88,7 +98,7 @@ export default function PerformanceTracker({ displayCurrency, showValues, combin
         </div>
 
         {(data?.topMover || data?.worstMover) && (
-          <div className="flex items-center gap-4 mt-4 pt-3 border-t border-border/30">
+          <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-border/30 pt-3">
             {data.topMover?.change_percent > 0 && (
               <div className="flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-green" />

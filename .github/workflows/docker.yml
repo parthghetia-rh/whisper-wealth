@@ -35,6 +35,7 @@ jobs:
         run: |
           npm ci
           npm test
+          npm run test:ui
           npm run build
 
       - name: Log in to GitHub Container Registry

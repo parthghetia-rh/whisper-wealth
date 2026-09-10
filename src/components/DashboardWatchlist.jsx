@@ -59,7 +59,7 @@ export default function DashboardWatchlist({ holdings, showValues, refreshKey })
           ) : (
             <>
               {/* Mobile cards */}
-              <div className="md:hidden space-y-2.5">
+              <div className="space-y-2.5 lg:hidden">
                 {watchlistItems.map((item) => {
                   const q = item.quote
                   if (!q) return null
@@ -72,7 +72,7 @@ export default function DashboardWatchlist({ holdings, showValues, refreshKey })
               </div>
 
               {/* Desktop table */}
-              <div className="hidden md:block bg-surface-2 rounded-xl border border-border overflow-x-auto">
+              <div className="hidden overflow-x-auto rounded-xl border border-border bg-surface-2 lg:block">
                 <table className="w-full text-sm min-w-[650px]">
                   <thead>
                     <tr className="border-b border-border text-text-muted text-xs uppercase tracking-wider">

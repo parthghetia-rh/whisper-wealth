@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { Fragment, useState } from 'react'
 import { currencySymbol } from '../utils/currency'
 import StockCard from './StockCard'
 import TickerChart from './TickerChart'
@@ -69,7 +69,7 @@ export default function HoldingsTable({ holdings, showValues = true }) {
   return (
     <div className="space-y-4">
       {/* Mobile sort control */}
-      <div className="md:hidden flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2 lg:hidden">
         <span className="text-xs text-text-muted">Sort:</span>
         <select
           value={sortKey || ''}
@@ -78,7 +78,7 @@ export default function HoldingsTable({ holdings, showValues = true }) {
             setSortKey(key)
             setSortDir(key === 'ticker' ? 'asc' : 'desc')
           }}
-          className="bg-surface-3 border border-border rounded-lg px-2 py-1.5 text-xs text-text outline-none"
+          className="min-h-10 min-w-0 flex-1 rounded-lg border border-border bg-surface-3 px-2 text-sm text-text outline-none sm:flex-none"
         >
           {SORT_OPTIONS.map((o) => (
             <option key={o.key || 'default'} value={o.key || ''}>{o.label}</option>
@@ -87,7 +87,7 @@ export default function HoldingsTable({ holdings, showValues = true }) {
         {sortKey && (
           <button
             onClick={() => setSortDir(sortDir === 'asc' ? 'desc' : 'asc')}
-            className="flex items-center gap-1 text-xs text-text-muted hover:text-text px-2 py-1 bg-surface-3 border border-border rounded-lg"
+            className="flex min-h-10 items-center gap-1 whitespace-nowrap rounded-lg border border-border bg-surface-3 px-3 text-xs text-text-muted hover:text-text"
           >
             {sortDir === 'asc' ? 'Low first' : 'High first'}
             <svg width="8" height="10" viewBox="0 0 8 10" fill="currentColor" className="text-accent">
@@ -108,7 +108,7 @@ export default function HoldingsTable({ holdings, showValues = true }) {
             </div>
 
             {/* Mobile: card view */}
-            <div className="md:hidden space-y-2">
+            <div className="space-y-2 lg:hidden">
               {items.map((h) => {
                 const isExpanded = expandedTicker === h.ticker
                 return (
@@ -131,7 +131,7 @@ export default function HoldingsTable({ holdings, showValues = true }) {
             </div>
 
             {/* Desktop: table view */}
-            <div className="hidden md:block bg-surface-2 rounded-xl border border-border overflow-x-auto">
+            <div className="hidden overflow-x-auto rounded-xl border border-border bg-surface-2 lg:block">
               <table className="w-full text-sm min-w-[750px]">
                 <thead>
                   <tr className="border-b border-border text-text-muted text-xs uppercase tracking-wider">
@@ -156,9 +156,8 @@ export default function HoldingsTable({ holdings, showValues = true }) {
                 <tbody>
                   {items.map((h) => {
                     const isExpanded = expandedTicker === h.ticker
-                    return (<>
+                    return (<Fragment key={h.ticker}>
                     <tr
-                      key={h.ticker}
                       onClick={() => setExpandedTicker(isExpanded ? null : h.ticker)}
                       className={`border-b border-border/50 cursor-pointer transition-colors ${
                         isExpanded ? 'bg-surface-3/40' : 'hover:bg-surface-3/50'
@@ -220,7 +219,7 @@ export default function HoldingsTable({ holdings, showValues = true }) {
                         </td>
                       </tr>
                     )}
-                    </>)
+                    </Fragment>)
                   })}
                 </tbody>
               </table>

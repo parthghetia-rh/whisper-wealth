@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { postApi } from '../hooks/useApi'
 import OwnerSelect from './OwnerSelect'
 
-export default function TransactionForm({ onAdded }) {
+export default function TransactionForm({ onAdded, embedded = false }) {
   const [form, setForm] = useState({
     ticker: '',
     type: 'buy',
@@ -44,15 +44,15 @@ export default function TransactionForm({ onAdded }) {
   return (
     <form
       onSubmit={handleSubmit}
-      className="bg-surface-2 rounded-xl border border-border p-5"
+      className={embedded ? '' : 'rounded-xl border border-border bg-surface-2 p-5'}
     >
-      <h3 className="text-sm font-medium mb-4">Add Transaction</h3>
+      {!embedded && <h3 className="mb-4 text-sm font-medium">Add Transaction</h3>}
       {error && (
         <div className="text-red text-xs mb-3 bg-red/10 rounded-lg px-3 py-2">
           {error}
         </div>
       )}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
+      <div className={`grid grid-cols-1 gap-3 sm:grid-cols-2 ${embedded ? 'lg:grid-cols-3' : 'md:grid-cols-4 lg:grid-cols-7'}`}>
         <OwnerSelect
           value={form.owner_scope}
           onChange={(owner_scope) => setForm((current) => ({ ...current, owner_scope }))}

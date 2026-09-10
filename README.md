@@ -147,7 +147,7 @@ docker compose -f docker-compose.dev.yml up -d --build
 
 ### Local Development (No Docker)
 
-Requires Node.js 20+.
+Requires Node.js 22+.
 
 ```bash
 git clone https://github.com/parthghetia-rh/whisper-wealth.git && cd portfolio-tracker

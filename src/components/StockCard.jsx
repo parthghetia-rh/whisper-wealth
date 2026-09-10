@@ -13,6 +13,14 @@ export default function StockCard({ item, onClick, variant = 'holding', hasActio
   return (
     <div
       onClick={onClick}
+      onKeyDown={(event) => {
+        if (onClick && (event.key === 'Enter' || event.key === ' ')) {
+          event.preventDefault()
+          onClick(event)
+        }
+      }}
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick ? 0 : undefined}
       className={`bg-surface-2 border border-border rounded-xl px-4 py-3 ${
         onClick ? 'cursor-pointer active:bg-surface-3/60 active:scale-[0.99] transition-transform' : ''
       } ${hasAction ? 'pr-12' : ''}`}
@@ -51,7 +59,7 @@ export default function StockCard({ item, onClick, variant = 'holding', hasActio
                 up ? 'bg-green/15 text-green' : 'bg-red/15 text-red'
               }`}
             >
-              {up ? '+' : ''}{(item.change_percent ?? 0).toFixed(2)}%
+              <span aria-hidden="true">{up ? '↑ ' : '↓ '}</span>{up ? '+' : ''}{(item.change_percent ?? 0).toFixed(2)}%
             </span>
           </div>
         </div>

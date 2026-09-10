@@ -193,6 +193,29 @@ test('v2 data migrates to Primary and household scopes stay isolated without pro
   assert.deepEqual(limitedHistory.available_ranges, ['1m'])
   assert.ok(limitedHistory.range_unlocks['3m'])
 
+  stmtRun(`INSERT INTO quotes
+    (ticker, currency, price, regular_market_price, status, last_success_at)
+    VALUES ('COST-TEST', 'USD', 25, 25, 'fresh', datetime('now'))`)
+  for (const transaction of [
+    { type: 'buy', shares: 10, price_per_share: 10, date: '2026-03-01' },
+    { type: 'buy', shares: 10, price_per_share: 20, date: '2026-03-02' },
+    { type: 'sell', shares: 5, price_per_share: 30, date: '2026-03-03' },
+  ]) {
+    const response = await fetch(`${base}/api/transactions`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...transaction, ticker: 'COST-TEST', owner_scope: `member:${primary.id}` }),
+    })
+    assert.equal(response.status, 201)
+  }
+  const costBasisHoldings = await fetch(`${base}/api/portfolio?scope=member:${primary.id}`)
+    .then((response) => response.json())
+  const costBasis = costBasisHoldings.find((holding) => holding.ticker === 'COST-TEST')
+  assert.equal(costBasis.shares, 15)
+  assert.equal(costBasis.avg_cost, 15)
+  assert.equal(costBasis.total_cost, 225)
+  assert.equal(costBasis.gain_loss, 150)
+  assert.equal(costBasis.gain_loss_percent, 66.67)
+
   const invalidOwner = await fetch(`${base}/api/transactions`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ ...transactionBody, owner_scope: 'household' }),

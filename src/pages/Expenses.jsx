@@ -3,6 +3,8 @@ import { useApi, postApi, putApi, deleteApi } from '../hooks/useApi'
 import { currencySymbol, formatCurrency } from '../utils/currency'
 import { useHousehold } from '../context/HouseholdContext'
 import OwnerSelect, { OwnerBadge } from '../components/OwnerSelect'
+import { notify } from '../components/ToastViewport'
+import RecordListSkeleton from '../components/RecordListSkeleton'
 
 const CATEGORIES = [
   { id: 'housing', label: 'Housing' },
@@ -27,7 +29,7 @@ const CATEGORY_COLORS = {
 
 export default function Expenses() {
   const { scopedUrl } = useHousehold()
-  const { data: expenses, refetch } = useApi(scopedUrl('/api/expenses'))
+  const { data: expenses, loading: expensesLoading, refetch } = useApi(scopedUrl('/api/expenses'))
   const { data: summary, refetch: refetchSummary } = useApi(scopedUrl('/api/expenses/summary'))
 
   const [form, setForm] = useState({
@@ -37,6 +39,7 @@ export default function Expenses() {
   const [loading, setLoading] = useState(false)
   const [editingId, setEditingId] = useState(null)
   const [editForm, setEditForm] = useState(null)
+  const [formOpen, setFormOpen] = useState(false)
 
   const handleAdd = async (e) => {
     e.preventDefault()
@@ -46,13 +49,21 @@ export default function Expenses() {
       await postApi('/api/expenses', { ...form, amount: Number(form.amount) })
       setForm((current) => ({ label: '', category: 'other', currency: 'CAD', amount: '', frequency: 'monthly', owner_scope: current.owner_scope }))
       refetch(); refetchSummary()
-    } catch (err) { setError(err.message) }
+      setFormOpen(false)
+      notify('Expense added')
+    } catch (err) { setError(err.message); notify(err.message, { tone: 'error' }) }
     finally { setLoading(false) }
   }
 
   const handleDelete = async (id) => {
-    await deleteApi(`/api/expenses/${id}`)
-    refetch(); refetchSummary()
+    try {
+      await deleteApi(`/api/expenses/${id}`)
+      refetch(); refetchSummary()
+      notify('Expense deleted', { tone: 'info' })
+    } catch (err) {
+      setError(err.message)
+      notify(err.message, { tone: 'error' })
+    }
   }
 
   const startEdit = (e) => {
@@ -69,7 +80,8 @@ export default function Expenses() {
       await putApi(`/api/expenses/${editingId}`, { ...editForm, amount: Number(editForm.amount) })
       setEditingId(null); setEditForm(null)
       refetch(); refetchSummary()
-    } catch (err) { setError(err.message) }
+      notify('Expense updated')
+    } catch (err) { setError(err.message); notify(err.message, { tone: 'error' }) }
   }
 
   const [sortKey, setSortKey] = useState(null)
@@ -112,11 +124,14 @@ export default function Expenses() {
 
   return (
     <div className="space-y-6 max-w-6xl">
-      <div>
-        <h2 className="text-xl font-semibold">Expenses</h2>
-        <p className="text-sm text-text-muted mt-0.5">
-          Track recurring expenses — mortgage, bills, subscriptions, and more
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-xl font-semibold">Expenses</h2>
+          <p className="mt-0.5 text-sm text-text-muted">Track recurring expenses — mortgage, bills, subscriptions, and more</p>
+        </div>
+        <button type="button" onClick={() => setFormOpen((open) => !open)} className="min-h-11 rounded-lg bg-accent px-4 text-sm font-medium text-white hover:bg-accent-hover md:hidden">
+          {formOpen ? 'Close form' : 'Add expense'}
+        </button>
       </div>
 
       {error && (
@@ -179,7 +194,7 @@ export default function Expenses() {
         </div>
       )}
 
-      <div className="bg-surface-2 rounded-xl border border-border p-5">
+      <div className={`${formOpen ? 'block' : 'hidden'} rounded-xl border border-border bg-surface-2 p-4 md:block md:p-5`}>
         <h3 className="text-sm font-medium mb-4">Add Expense</h3>
         <form onSubmit={handleAdd}>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-7 gap-3">
@@ -231,14 +246,23 @@ export default function Expenses() {
         </form>
       </div>
 
-      {!(expenses?.length) ? (
+      {expensesLoading ? (
+        <RecordListSkeleton />
+      ) : !(expenses?.length) ? (
         <div className="bg-surface-2 rounded-xl border border-border p-8 text-center text-text-muted">
           No expenses yet. Add your recurring expenses above.
         </div>
       ) : (
         <div>
           <h3 className="text-sm font-medium text-text-muted mb-3">All Expenses</h3>
-          <div className="bg-surface-2 rounded-xl border border-border overflow-x-auto">
+          <div className="space-y-2 md:hidden">
+            {sortedExpenses.map((expense) => editingId === expense.id ? (
+              <MobileExpenseEditor key={expense.id} form={editForm} setForm={setEditForm} onSave={saveEdit} onCancel={() => setEditingId(null)} />
+            ) : (
+              <MobileExpenseCard key={expense.id} expense={expense} onEdit={() => startEdit(expense)} onDelete={() => handleDelete(expense.id)} />
+            ))}
+          </div>
+          <div className="hidden overflow-x-auto rounded-xl border border-border bg-surface-2 md:block">
             <table className="w-full text-sm min-w-[650px]">
               <thead>
                 <tr className="border-b border-border text-text-muted text-xs uppercase tracking-wider">
@@ -367,4 +391,57 @@ export default function Expenses() {
       )}
     </div>
   )
+}
+
+export function MobileExpenseCard({ expense, onEdit, onDelete }) {
+  const annual = expense.frequency === 'weekly' ? expense.amount * 52
+    : expense.frequency === 'biweekly' ? expense.amount * 26
+      : expense.frequency === 'monthly' ? expense.amount * 12 : expense.amount
+  return (
+    <article className="rounded-xl border border-border bg-surface-2 p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <h4 className="font-semibold">{expense.label}</h4>
+            <span className="inline-flex items-center gap-1.5 rounded bg-surface-3 px-2 py-0.5 text-xs capitalize"><span className="h-2 w-2 rounded-full" style={{ backgroundColor: CATEGORY_COLORS[expense.category] }} />{expense.category}</span>
+          </div>
+          <div className="mt-1"><OwnerBadge name={expense.owner_name} color={expense.owner_color} /></div>
+        </div>
+        <div className="flex shrink-0">
+          <button type="button" onClick={onEdit} className="icon-button" aria-label={`Edit ${expense.label}`}><EditSmallIcon /></button>
+          <button type="button" onClick={onDelete} className="icon-button hover:!bg-red/10 hover:!text-red" aria-label={`Delete ${expense.label}`}><TrashSmallIcon /></button>
+        </div>
+      </div>
+      <dl className="mt-4 grid grid-cols-3 gap-3 border-t border-border/50 pt-3 text-xs">
+        <div><dt className="text-text-muted">Amount</dt><dd className="mt-1 font-semibold tabular-nums">{formatCurrency(expense.amount, expense.currency)}</dd></div>
+        <div><dt className="text-text-muted">Frequency</dt><dd className="mt-1 font-medium capitalize">{expense.frequency}</dd></div>
+        <div className="text-right"><dt className="text-text-muted">Monthly</dt><dd className="mt-1 font-semibold tabular-nums text-red"><span aria-hidden="true">↓ </span>{formatCurrency(annual / 12, expense.currency)}</dd></div>
+      </dl>
+    </article>
+  )
+}
+
+function MobileExpenseEditor({ form, setForm, onSave, onCancel }) {
+  const update = (key, value) => setForm((current) => ({ ...current, [key]: value }))
+  return (
+    <article className="space-y-3 rounded-xl border border-accent/40 bg-accent/5 p-4">
+      <label><span className="mb-1 block text-xs text-text-muted">Label</span><input value={form.label} onChange={(event) => update('label', event.target.value)} className="min-h-11 w-full rounded-lg border border-border bg-surface-3 px-3 text-sm" /></label>
+      <div className="grid grid-cols-2 gap-3">
+        <label><span className="mb-1 block text-xs text-text-muted">Category</span><select value={form.category} onChange={(event) => update('category', event.target.value)} className="min-h-11 w-full rounded-lg border border-border bg-surface-3 px-3 text-sm">{CATEGORIES.map((category) => <option key={category.id} value={category.id}>{category.label}</option>)}</select></label>
+        <label><span className="mb-1 block text-xs text-text-muted">Currency</span><select value={form.currency} onChange={(event) => update('currency', event.target.value)} className="min-h-11 w-full rounded-lg border border-border bg-surface-3 px-3 text-sm"><option>CAD</option><option>USD</option><option>INR</option><option>EUR</option><option>GBP</option></select></label>
+        <label><span className="mb-1 block text-xs text-text-muted">Amount</span><input type="number" step="any" min="0.01" value={form.amount} onChange={(event) => update('amount', event.target.value)} className="min-h-11 w-full rounded-lg border border-border bg-surface-3 px-3 text-sm" /></label>
+        <label><span className="mb-1 block text-xs text-text-muted">Frequency</span><select value={form.frequency} onChange={(event) => update('frequency', event.target.value)} className="min-h-11 w-full rounded-lg border border-border bg-surface-3 px-3 text-sm"><option value="weekly">Weekly</option><option value="biweekly">Biweekly</option><option value="monthly">Monthly</option><option value="yearly">Yearly</option></select></label>
+        <OwnerSelect value={form.owner_scope} onChange={(value) => update('owner_scope', value)} includeLabel />
+      </div>
+      <div className="flex justify-end gap-2"><button type="button" onClick={onCancel} className="min-h-11 rounded-lg px-4 text-sm text-text-muted">Cancel</button><button type="button" onClick={onSave} className="min-h-11 rounded-lg bg-accent px-4 text-sm font-medium text-white">Save</button></div>
+    </article>
+  )
+}
+
+function EditSmallIcon() {
+  return <svg width="16" height="16" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M8.5 2.5l3 3M1.5 9.5l-.5 3.5 3.5-.5 8-8-3-3z" /></svg>
+}
+
+function TrashSmallIcon() {
+  return <svg width="16" height="16" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M3 3.5h8M5.5 3.5V2.5a1 1 0 011-1h1a1 1 0 011 1v1M9.5 3.5v7a1 1 0 01-1 1h-3a1 1 0 01-1-1v-7" /></svg>
 }

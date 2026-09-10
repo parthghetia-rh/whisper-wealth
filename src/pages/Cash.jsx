@@ -3,10 +3,12 @@ import { useApi, postApi, putApi, deleteApi } from '../hooks/useApi'
 import { currencySymbol, formatCurrency } from '../utils/currency'
 import { useHousehold } from '../context/HouseholdContext'
 import OwnerSelect, { OwnerBadge } from '../components/OwnerSelect'
+import { notify } from '../components/ToastViewport'
+import RecordListSkeleton from '../components/RecordListSkeleton'
 
 export default function Cash() {
   const { scopedUrl } = useHousehold()
-  const { data: positions, refetch } = useApi(scopedUrl('/api/cash'))
+  const { data: positions, loading: positionsLoading, refetch } = useApi(scopedUrl('/api/cash'))
   const { data: summary, refetch: refetchSummary } = useApi(scopedUrl('/api/cash/summary'))
 
   const [cashForm, setCashForm] = useState({
@@ -19,6 +21,8 @@ export default function Cash() {
   const [loading, setLoading] = useState(false)
   const [editingId, setEditingId] = useState(null)
   const [editForm, setEditForm] = useState(null)
+  const [cashFormOpen, setCashFormOpen] = useState(false)
+  const [incomeFormOpen, setIncomeFormOpen] = useState(false)
 
   const handleAddCash = async (e) => {
     e.preventDefault()
@@ -32,7 +36,9 @@ export default function Cash() {
       })
       setCashForm((current) => ({ label: '', currency: 'CAD', amount: '', interest_rate: '', owner_scope: current.owner_scope }))
       refetch(); refetchSummary()
-    } catch (err) { setError(err.message) }
+      setCashFormOpen(false)
+      notify('Cash position added')
+    } catch (err) { setError(err.message); notify(err.message, { tone: 'error' }) }
     finally { setLoading(false) }
   }
 
@@ -48,13 +54,21 @@ export default function Cash() {
       })
       setIncomeForm((current) => ({ label: '', currency: 'CAD', amount: '', frequency: 'monthly', owner_scope: current.owner_scope }))
       refetch(); refetchSummary()
-    } catch (err) { setError(err.message) }
+      setIncomeFormOpen(false)
+      notify('Recurring income added')
+    } catch (err) { setError(err.message); notify(err.message, { tone: 'error' }) }
     finally { setLoading(false) }
   }
 
   const handleDelete = async (id) => {
-    await deleteApi(`/api/cash/${id}`)
-    refetch(); refetchSummary()
+    try {
+      await deleteApi(`/api/cash/${id}`)
+      refetch(); refetchSummary()
+      notify('Entry deleted', { tone: 'info' })
+    } catch (err) {
+      setError(err.message)
+      notify(err.message, { tone: 'error' })
+    }
   }
 
   const startEdit = (p) => {
@@ -78,7 +92,8 @@ export default function Cash() {
       })
       setEditingId(null); setEditForm(null)
       refetch(); refetchSummary()
-    } catch (err) { setError(err.message) }
+      notify('Entry updated')
+    } catch (err) { setError(err.message); notify(err.message, { tone: 'error' }) }
   }
 
   const currencies = summary?.currencies || []
@@ -87,11 +102,15 @@ export default function Cash() {
 
   return (
     <div className="space-y-6 max-w-6xl">
-      <div>
-        <h2 className="text-xl font-semibold">Cash & Income</h2>
-        <p className="text-sm text-text-muted mt-0.5">
-          Track sitting cash with interest, and recurring income like cashback, rent, or paybacks
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-xl font-semibold">Cash & Income</h2>
+          <p className="mt-0.5 text-sm text-text-muted">Track sitting cash with interest, and predictable recurring income</p>
+        </div>
+        <div className="flex gap-2 md:hidden">
+          <button type="button" onClick={() => { setCashFormOpen((open) => !open); setIncomeFormOpen(false) }} className="min-h-11 rounded-lg bg-accent px-3 text-sm font-medium text-white">Add cash</button>
+          <button type="button" onClick={() => { setIncomeFormOpen((open) => !open); setCashFormOpen(false) }} className="min-h-11 rounded-lg border border-border bg-surface-2 px-3 text-sm font-medium">Add income</button>
+        </div>
       </div>
 
       {error && (
@@ -137,7 +156,7 @@ export default function Cash() {
         </div>
       )}
 
-      <div className="bg-surface-2 rounded-xl border border-border p-5">
+      <div className={`${cashFormOpen ? 'block' : 'hidden'} rounded-xl border border-border bg-surface-2 p-4 md:block md:p-5`}>
         <h3 className="text-sm font-medium mb-4">Add Cash Position</h3>
         <form onSubmit={handleAddCash}>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-6 gap-3">
@@ -174,7 +193,7 @@ export default function Cash() {
         </form>
       </div>
 
-      <div className="bg-surface-2 rounded-xl border border-border p-5">
+      <div className={`${incomeFormOpen ? 'block' : 'hidden'} rounded-xl border border-border bg-surface-2 p-4 md:block md:p-5`}>
         <h3 className="text-sm font-medium mb-1">Add Recurring Income</h3>
         <p className="text-xs text-text-muted mb-4">
           Cashback, rent, side income, paybacks — any predictable recurring amount
@@ -220,7 +239,14 @@ export default function Cash() {
       {cashPositions.length > 0 && (
         <div>
           <h3 className="text-sm font-medium text-text-muted mb-3">Cash Positions</h3>
-          <div className="bg-surface-2 rounded-xl border border-border overflow-x-auto">
+          <div className="space-y-2 md:hidden">
+            {cashPositions.map((position) => editingId === position.id ? (
+              <MobileCashEditor key={position.id} form={editForm} setForm={setEditForm} onSave={saveEdit} onCancel={() => setEditingId(null)} />
+            ) : (
+              <MobileCashCard key={position.id} position={position} onEdit={() => startEdit(position)} onDelete={() => handleDelete(position.id)} />
+            ))}
+          </div>
+          <div className="hidden overflow-x-auto rounded-xl border border-border bg-surface-2 md:block">
             <table className="w-full text-sm min-w-[600px]">
               <thead>
                 <tr className="border-b border-border text-text-muted text-xs uppercase tracking-wider">
@@ -245,7 +271,14 @@ export default function Cash() {
       {incomePositions.length > 0 && (
         <div>
           <h3 className="text-sm font-medium text-text-muted mb-3">Recurring Income</h3>
-          <div className="bg-surface-2 rounded-xl border border-border overflow-x-auto">
+          <div className="space-y-2 md:hidden">
+            {incomePositions.map((position) => editingId === position.id ? (
+              <MobileCashEditor key={position.id} form={editForm} setForm={setEditForm} onSave={saveEdit} onCancel={() => setEditingId(null)} />
+            ) : (
+              <MobileCashCard key={position.id} position={position} onEdit={() => startEdit(position)} onDelete={() => handleDelete(position.id)} />
+            ))}
+          </div>
+          <div className="hidden overflow-x-auto rounded-xl border border-border bg-surface-2 md:block">
             <table className="w-full text-sm min-w-[600px]">
               <thead>
                 <tr className="border-b border-border text-text-muted text-xs uppercase tracking-wider">
@@ -267,7 +300,9 @@ export default function Cash() {
         </div>
       )}
 
-      {!cashPositions.length && !incomePositions.length && (
+      {positionsLoading && <RecordListSkeleton />}
+
+      {!positionsLoading && !cashPositions.length && !incomePositions.length && (
         <div className="bg-surface-2 rounded-xl border border-border p-8 text-center text-text-muted">
           No entries yet. Add a cash position or recurring income above.
         </div>
@@ -372,7 +407,9 @@ function CurrencySelect({ value, onChange, small }) {
     <div>
       {!small && <label className="block text-xs text-text-muted mb-1">Currency</label>}
       <select value={value} onChange={(e) => onChange(e.target.value)}
-        className={`w-full bg-surface-3 border border-border rounded${small ? '' : '-lg'} px-${small ? '2' : '3'} py-${small ? '1' : '2'} text-sm text-text outline-none focus:border-accent`}>
+        className={small
+          ? 'w-full rounded border border-border bg-surface-3 px-2 py-1 text-sm text-text outline-none focus:border-accent'
+          : 'min-h-11 w-full rounded-lg border border-border bg-surface-3 px-3 py-2 text-sm text-text outline-none focus:border-accent'}>
         <option value="CAD">CAD</option>
         <option value="USD">USD</option>
         <option value="INR">INR</option>
@@ -381,6 +418,63 @@ function CurrencySelect({ value, onChange, small }) {
       </select>
     </div>
   )
+}
+
+export function MobileCashCard({ position, onEdit, onDelete }) {
+  const isIncome = position.type === 'income'
+  const annual = isIncome
+    ? (position.frequency === 'weekly' ? position.amount * 52 : position.frequency === 'monthly' ? position.amount * 12 : position.amount)
+    : position.amount * (position.interest_rate / 100)
+  return (
+    <article className="rounded-xl border border-border bg-surface-2 p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <h4 className="font-semibold">{position.label}</h4>
+            <span className="rounded bg-surface-3 px-2 py-0.5 text-xs font-medium">{position.currency}</span>
+          </div>
+          <div className="mt-1"><OwnerBadge name={position.owner_name} color={position.owner_color} /></div>
+        </div>
+        <div className="flex shrink-0">
+          <button type="button" onClick={onEdit} className="icon-button" aria-label={`Edit ${position.label}`}><EditSmallIcon /></button>
+          <button type="button" onClick={onDelete} className="icon-button hover:!bg-red/10 hover:!text-red" aria-label={`Delete ${position.label}`}><TrashSmallIcon /></button>
+        </div>
+      </div>
+      <dl className="mt-4 grid grid-cols-3 gap-3 border-t border-border/50 pt-3 text-xs">
+        <div><dt className="text-text-muted">Amount</dt><dd className="mt-1 font-semibold tabular-nums">{formatCurrency(position.amount, position.currency)}</dd></div>
+        <div><dt className="text-text-muted">{isIncome ? 'Frequency' : 'Rate'}</dt><dd className="mt-1 font-medium capitalize">{isIncome ? position.frequency : `${position.interest_rate}%`}</dd></div>
+        <div className="text-right"><dt className="text-text-muted">Monthly</dt><dd className="mt-1 font-semibold tabular-nums text-green"><span aria-hidden="true">↑ </span>{formatCurrency(annual / 12, position.currency)}</dd></div>
+      </dl>
+    </article>
+  )
+}
+
+function MobileCashEditor({ form, setForm, onSave, onCancel }) {
+  const update = (key, value) => setForm((current) => ({ ...current, [key]: value }))
+  return (
+    <article className="space-y-3 rounded-xl border border-accent/40 bg-accent/5 p-4">
+      <label><span className="mb-1 block text-xs text-text-muted">Label</span><input value={form.label} onChange={(event) => update('label', event.target.value)} className="min-h-11 w-full rounded-lg border border-border bg-surface-3 px-3 text-sm" /></label>
+      <div className="grid grid-cols-2 gap-3">
+        <CurrencySelect value={form.currency} onChange={(value) => update('currency', value)} />
+        <label><span className="mb-1 block text-xs text-text-muted">Amount</span><input type="number" step="any" min="0" value={form.amount} onChange={(event) => update('amount', event.target.value)} className="min-h-11 w-full rounded-lg border border-border bg-surface-3 px-3 text-sm" /></label>
+        <OwnerSelect value={form.owner_scope} onChange={(value) => update('owner_scope', value)} includeLabel />
+        {form.type === 'income' ? (
+          <label><span className="mb-1 block text-xs text-text-muted">Frequency</span><select value={form.frequency} onChange={(event) => update('frequency', event.target.value)} className="min-h-11 w-full rounded-lg border border-border bg-surface-3 px-3 text-sm"><option value="weekly">Weekly</option><option value="monthly">Monthly</option><option value="yearly">Yearly</option></select></label>
+        ) : (
+          <label><span className="mb-1 block text-xs text-text-muted">Annual rate (%)</span><input type="number" step="any" min="0" value={form.interest_rate} onChange={(event) => update('interest_rate', event.target.value)} className="min-h-11 w-full rounded-lg border border-border bg-surface-3 px-3 text-sm" /></label>
+        )}
+      </div>
+      <div className="flex justify-end gap-2"><button type="button" onClick={onCancel} className="min-h-11 rounded-lg px-4 text-sm text-text-muted">Cancel</button><button type="button" onClick={onSave} className="min-h-11 rounded-lg bg-accent px-4 text-sm font-medium text-white">Save</button></div>
+    </article>
+  )
+}
+
+function EditSmallIcon() {
+  return <svg width="16" height="16" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M8.5 2.5l3 3M1.5 9.5l-.5 3.5 3.5-.5 8-8-3-3z" /></svg>
+}
+
+function TrashSmallIcon() {
+  return <svg width="16" height="16" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M3 3.5h8M5.5 3.5V2.5a1 1 0 011-1h1a1 1 0 011 1v1M9.5 3.5v7a1 1 0 01-1 1h-3a1 1 0 01-1-1v-7" /></svg>
 }
 
 function RowActions({ onEdit, onDelete }) {

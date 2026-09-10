@@ -6,6 +6,8 @@ import { deleteApi, postApi, putApi, useApi } from '../hooks/useApi'
 import OwnerSelect, { OwnerBadge } from '../components/OwnerSelect'
 import { formatCurrency } from '../utils/currency'
 import { useHousehold } from '../context/HouseholdContext'
+import ActionSheet from '../components/ActionSheet'
+import { notify } from '../components/ToastViewport'
 
 const CURRENCIES = ['CAD', 'USD', 'INR', 'EUR', 'GBP', 'JPY', 'AUD', 'HKD', 'SGD', 'CHF']
 
@@ -63,8 +65,10 @@ export default function RealEstate() {
       setForm(initialForm(form.owner_scope || defaultOwnerScope))
       setFormOpen(false)
       refetch()
+      notify('Property added')
     } catch (err) {
       setError(err.message)
+      notify(err.message, { tone: 'error' })
     } finally {
       setSaving(false)
     }
@@ -81,10 +85,10 @@ export default function RealEstate() {
         </div>
         <button
           type="button"
-          onClick={() => setFormOpen((open) => !open)}
-          className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-hover"
+          onClick={() => setFormOpen(true)}
+          className="min-h-11 rounded-lg bg-accent px-4 text-sm font-medium text-white transition-colors hover:bg-accent-hover"
         >
-          {formOpen ? 'Cancel' : 'Add Property'}
+          Add Property
         </button>
       </div>
 
@@ -109,13 +113,9 @@ export default function RealEstate() {
         </section>
       ))}
 
-      {formOpen && (
-        <section className="rounded-xl border border-border bg-surface-2 p-5">
-          <h3 className="mb-1 text-sm font-medium">Add Property</h3>
-          <p className="mb-4 text-xs text-text-muted">The initial value and mortgage balance become the first history entry.</p>
+      <ActionSheet open={formOpen} onClose={() => setFormOpen(false)} title="Add property" description="The initial value and mortgage balance become the first history entry." size="3xl">
           <PropertyCreateForm form={form} setForm={setForm} onSubmit={createProperty} saving={saving} />
-        </section>
-      )}
+      </ActionSheet>
 
       {loading ? (
         <div className="rounded-xl border border-border bg-surface-2 p-8 text-center text-sm text-text-muted">Loading properties…</div>
@@ -137,7 +137,7 @@ export default function RealEstate() {
         </div>
       )}
 
-      <p className="text-[11px] leading-relaxed text-text-muted">
+      <p className="text-xs leading-relaxed text-text-muted">
         Values are estimates you enter manually. Equity is value minus mortgage; appreciation is value minus purchase price and does not include renovations, transaction costs, or selling fees.
       </p>
     </div>
@@ -187,8 +187,10 @@ function PropertyCard({ property, onChanged }) {
     try {
       await deleteApi(`/api/properties/${property.id}`)
       onChanged()
+      notify('Property deleted', { tone: 'info' })
     } catch (err) {
       setError(err.message)
+      notify(err.message, { tone: 'error' })
     }
   }
 
@@ -207,12 +209,12 @@ function PropertyCard({ property, onChanged }) {
               Purchased {property.purchase_date} for {formatCurrency(property.purchase_price, property.currency)}
             </p>
           </div>
-          <div className="flex items-center gap-2">
-            <button type="button" onClick={() => { setUpdating((open) => !open); setEditing(false) }} className="rounded-lg bg-accent/15 px-3 py-1.5 text-xs font-medium text-accent-hover hover:bg-accent/25">
+          <div className="flex flex-wrap items-center gap-1 sm:gap-2">
+            <button type="button" onClick={() => { setUpdating((open) => !open); setEditing(false) }} className="min-h-11 rounded-lg bg-accent/15 px-3 text-xs font-medium text-accent-hover hover:bg-accent/25">
               Update values
             </button>
-            <button type="button" onClick={() => { setEditing((open) => !open); setUpdating(false) }} className="rounded-lg px-2 py-1.5 text-xs text-text-muted hover:bg-surface-3 hover:text-text">Edit</button>
-            <button type="button" onClick={remove} className="rounded-lg px-2 py-1.5 text-xs text-text-muted hover:bg-red/10 hover:text-red">Delete</button>
+            <button type="button" onClick={() => { setEditing((open) => !open); setUpdating(false) }} className="min-h-11 rounded-lg px-3 text-xs text-text-muted hover:bg-surface-3 hover:text-text">Edit</button>
+            <button type="button" onClick={remove} className="min-h-11 rounded-lg px-3 text-xs text-text-muted hover:bg-red/10 hover:text-red">Delete</button>
           </div>
         </div>
 
@@ -230,7 +232,7 @@ function PropertyCard({ property, onChanged }) {
           />
         </div>
 
-        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-[11px] text-text-muted">
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-text-muted">
           <span>As of {property.latest_snapshot?.valuation_date}</span>
           <span>
             Source:{' '}
@@ -245,7 +247,7 @@ function PropertyCard({ property, onChanged }) {
         {updating && <SnapshotForm property={property} onSaved={() => { setUpdating(false); changed() }} />}
         {editing && <PropertyEditForm property={property} onSaved={() => { setEditing(false); changed() }} />}
 
-        <button type="button" onClick={() => setExpanded((open) => !open)} className="mt-4 flex w-full items-center justify-center gap-1 border-t border-border pt-3 text-xs text-text-muted hover:text-text">
+        <button type="button" onClick={() => setExpanded((open) => !open)} className="mt-4 flex min-h-11 w-full items-center justify-center gap-1 border-t border-border pt-3 text-xs text-text-muted hover:text-text">
           {expanded ? 'Hide history' : 'Show history'}
           <span aria-hidden="true">{expanded ? '↑' : '↓'}</span>
         </button>
@@ -376,8 +378,10 @@ function PropertyHistory({ property, version, onChanged }) {
       setEditForm(null)
       refetch()
       onChanged()
+      notify('Property history updated')
     } catch (err) {
       setActionError(err.message)
+      notify(err.message, { tone: 'error' })
     }
   }
 
@@ -388,8 +392,10 @@ function PropertyHistory({ property, version, onChanged }) {
       await deleteApi(`/api/properties/${property.id}/snapshots/${snapshot.id}`)
       refetch()
       onChanged()
+      notify('Valuation deleted', { tone: 'info' })
     } catch (err) {
       setActionError(err.message)
+      notify(err.message, { tone: 'error' })
     }
   }
 
@@ -419,7 +425,24 @@ function PropertyHistory({ property, version, onChanged }) {
             </div>
           )}
 
-          <div className="overflow-x-auto rounded-lg border border-border">
+          <div className="space-y-2 md:hidden">
+            {[...history].reverse().map((snapshot) => editingId === snapshot.id ? (
+              <SnapshotEditCard key={snapshot.id} form={editForm} setForm={setEditForm} onSave={saveEdit} onCancel={() => { setEditingId(null); setEditForm(null) }} />
+            ) : (
+              <article key={snapshot.id} className="rounded-xl border border-border bg-surface-2 p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div><p className="font-medium tabular-nums">{snapshot.valuation_date}</p><p className="mt-1 text-xs text-text-muted">{snapshot.source_label}{snapshot.note ? ` · ${snapshot.note}` : ''}</p></div>
+                  <div className="flex shrink-0"><button type="button" onClick={() => startEdit(snapshot)} className="icon-button" aria-label={`Edit valuation from ${snapshot.valuation_date}`}>Edit</button><button type="button" onClick={() => remove(snapshot)} disabled={history.length <= 1} className="icon-button hover:!bg-red/10 hover:!text-red disabled:opacity-30" aria-label={`Delete valuation from ${snapshot.valuation_date}`}>Delete</button></div>
+                </div>
+                <dl className="mt-3 grid grid-cols-3 gap-2 border-t border-border/50 pt-3 text-xs">
+                  <div><dt className="text-text-muted">Value</dt><dd className="mt-1 font-medium tabular-nums">{formatCurrency(snapshot.estimated_value, property.currency)}</dd></div>
+                  <div><dt className="text-text-muted">Mortgage</dt><dd className="mt-1 font-medium tabular-nums">{formatCurrency(snapshot.mortgage_balance, property.currency)}</dd></div>
+                  <div className="text-right"><dt className="text-text-muted">Equity</dt><dd className={`mt-1 font-semibold tabular-nums ${snapshot.equity >= 0 ? 'text-green' : 'text-red'}`}><span aria-hidden="true">{snapshot.equity >= 0 ? '↑ ' : '↓ '}</span>{formatCurrency(snapshot.equity, property.currency)}</dd></div>
+                </dl>
+              </article>
+            ))}
+          </div>
+          <div className="hidden overflow-x-auto rounded-lg border border-border md:block">
             <table className="min-w-[760px] w-full text-xs">
               <thead>
                 <tr className="border-b border-border text-left uppercase tracking-wider text-text-muted">
@@ -483,6 +506,22 @@ function SnapshotEditRow({ form, setForm, onSave, onCancel }) {
   )
 }
 
+function SnapshotEditCard({ form, setForm, onSave, onCancel }) {
+  const update = (key, value) => setForm((current) => ({ ...current, [key]: value }))
+  return (
+    <article className="space-y-3 rounded-xl border border-accent/40 bg-accent/5 p-4">
+      <div className="grid grid-cols-2 gap-3">
+        <DateField label="Date" value={form.valuation_date} onChange={(value) => update('valuation_date', value)} required />
+        <NumberField label="Value" value={form.estimated_value} onChange={(value) => update('estimated_value', value)} min="0.01" required />
+        <NumberField label="Mortgage" value={form.mortgage_balance} onChange={(value) => update('mortgage_balance', value)} min="0" required />
+        <TextField label="Source" value={form.source_label} onChange={(value) => update('source_label', value)} />
+        <label className="col-span-2"><span className="mb-1 block text-xs text-text-muted">Note</span><input value={form.note} onChange={(event) => update('note', event.target.value)} className="min-h-11 w-full rounded-lg border border-border bg-surface-3 px-3 text-sm" /></label>
+      </div>
+      <div className="flex justify-end gap-2"><button type="button" onClick={onCancel} className="min-h-11 rounded-lg px-4 text-sm text-text-muted">Cancel</button><button type="button" onClick={onSave} className="min-h-11 rounded-lg bg-accent px-4 text-sm font-medium text-white">Save</button></div>
+    </article>
+  )
+}
+
 function HistoryTooltip({ active, payload, label, currency }) {
   if (!active || !payload?.length) return null
   return (
@@ -505,9 +544,9 @@ function MetricCard({ label, value, sub, tone }) {
   const color = tone === 'green' ? 'text-green' : tone === 'red' ? 'text-red' : 'text-text'
   return (
     <div className="rounded-xl border border-border/60 bg-gradient-to-br from-surface-2 to-surface-3/50 p-4">
-      <div className="mb-1 text-[10px] uppercase tracking-widest text-text-muted">{label}</div>
-      <div className={`text-lg font-bold tabular-nums ${color}`}>{value}</div>
-      {sub && <div className={`mt-0.5 text-[11px] tabular-nums ${color}`}>{sub}</div>}
+      <div className="mb-1 text-xs text-text-muted">{label}</div>
+      <div className={`text-lg font-bold tabular-nums ${color}`}>{tone && <span aria-hidden="true" className="mr-1">{tone === 'green' ? '↑' : '↓'}</span>}{value}</div>
+      {sub && <div className={`mt-0.5 text-xs tabular-nums ${color}`}>{sub}</div>}
     </div>
   )
 }

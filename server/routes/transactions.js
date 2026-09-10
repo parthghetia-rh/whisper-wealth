@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import { stmtGet, stmtRun, stmtRunBatch, save } from '../db.js'
+import { stmtGet, stmtRun, stmtRunBatch, transaction } from '../db.js'
 import { triggerPoll } from '../services/poller.js'
 import { parseHeaders, importWithMapping } from '../services/csvParser.js'
 import { parsePDF } from '../services/pdfParser.js'
@@ -209,28 +209,29 @@ router.post('/import', (req, res) => {
 
   let imported = 0
   const skippedDetails = [...result.skipped]
-  for (const t of result.transactions) {
-    const duplicate = stmtGet(
-      `SELECT 1 FROM transactions
-       WHERE ticker = ? AND type = ? AND shares = ? AND price_per_share = ? AND date = ? AND source = ?
-         AND ((member_id IS NULL AND ? IS NULL) OR member_id = ?)`,
-      [t.ticker, t.type, t.shares, t.price_per_share, t.date, t.source, owner.memberId, owner.memberId]
-    )
-    if (duplicate) {
-      skippedDetails.push({ ticker: t.ticker, reason: 'This imported position already exists' })
-      continue
+  transaction(() => {
+    for (const t of result.transactions) {
+      const duplicate = stmtGet(
+        `SELECT 1 FROM transactions
+         WHERE ticker = ? AND type = ? AND shares = ? AND price_per_share = ? AND date = ? AND source = ?
+           AND ((member_id IS NULL AND ? IS NULL) OR member_id = ?)`,
+        [t.ticker, t.type, t.shares, t.price_per_share, t.date, t.source, owner.memberId, owner.memberId]
+      )
+      if (duplicate) {
+        skippedDetails.push({ ticker: t.ticker, reason: 'This imported position already exists' })
+        continue
+      }
+      stmtRunBatch(
+        'INSERT INTO transactions (ticker, type, shares, price_per_share, date, member_id, source) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        [t.ticker, t.type, t.shares, t.price_per_share, t.date, owner.memberId, t.source || 'transaction_import']
+      )
+      const inWatchlist = stmtGet('SELECT 1 FROM watchlist WHERE ticker = ?', [t.ticker])
+      if (!inWatchlist) {
+        try { stmtRunBatch('INSERT INTO watchlist (ticker) VALUES (?)', [t.ticker]) } catch {}
+      }
+      imported++
     }
-    stmtRunBatch(
-      'INSERT INTO transactions (ticker, type, shares, price_per_share, date, member_id, source) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [t.ticker, t.type, t.shares, t.price_per_share, t.date, owner.memberId, t.source || 'transaction_import']
-    )
-    const inWatchlist = stmtGet('SELECT 1 FROM watchlist WHERE ticker = ?', [t.ticker])
-    if (!inWatchlist) {
-      try { stmtRunBatch('INSERT INTO watchlist (ticker) VALUES (?)', [t.ticker]) } catch {}
-    }
-    imported++
-  }
-  save()
+  })
   updatePortfolioSnapshot()
   refreshAfterChange()
 
