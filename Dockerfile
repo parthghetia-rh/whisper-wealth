@@ -29,7 +29,6 @@ ENV NODE_ENV=production
 ENV HOST=0.0.0.0
 ENV PORT=3000
 ENV DB_PATH=/data/portfolio.db
-ENV TOKEN_PATH=/data/.auth-token
 
 EXPOSE 3000
 

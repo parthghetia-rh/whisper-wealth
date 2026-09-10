@@ -4,7 +4,10 @@ import { dirname, join } from 'path'
 import { fileURLToPath } from 'url'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
-const tokenPath = process.env.TOKEN_PATH || join(__dirname, '..', '.auth-token')
+const defaultTokenDirectory = process.env.DB_PATH
+  ? dirname(process.env.DB_PATH)
+  : join(__dirname, '..')
+const tokenPath = process.env.TOKEN_PATH || join(defaultTokenDirectory, '.auth-token')
 
 let authToken
 let isFirstRun = false
