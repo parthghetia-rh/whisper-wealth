@@ -13,7 +13,7 @@ const Dividends = lazy(() => import('./pages/Dividends'))
 const Cash = lazy(() => import('./pages/Cash'))
 const Watchlist = lazy(() => import('./pages/Watchlist'))
 const Settings = lazy(() => import('./pages/Settings'))
-const Milestones = lazy(() => import('./pages/Milestones'))
+const ContributionRoom = lazy(() => import('./pages/ContributionRoom'))
 const Expenses = lazy(() => import('./pages/Expenses'))
 const RealEstate = lazy(() => import('./pages/RealEstate'))
 
@@ -46,7 +46,7 @@ export default function App() {
               <Route path="/real-estate" element={<LazyPage component={RealEstate} />} />
               <Route path="/watchlist" element={<LazyPage component={Watchlist} />} />
               <Route path="/settings" element={<LazyPage component={Settings} />} />
-              <Route path="/milestones" element={<LazyPage component={Milestones} />} />
+              <Route path="/contribution-room" element={<LazyPage component={ContributionRoom} />} />
             </Route>
           </Routes>
           <ToastViewport />

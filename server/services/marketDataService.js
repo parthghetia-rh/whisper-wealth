@@ -4,7 +4,6 @@ import {
 import {
   getQuotes, getDividendHistory, getPeriodChanges, getProviderMetrics,
 } from './stockService.js'
-import { checkMilestones } from './milestones.js'
 import { listSnapshotScopes, scopeWhere } from './household.js'
 
 const ACTIVE_REGULAR_INTERVAL = Number(process.env.QUOTE_ACTIVE_INTERVAL_MS) || 60_000
@@ -250,24 +249,6 @@ export function updatePortfolioSnapshot() {
     }
   })
 
-  for (const [scopeKey, byCurrency] of scopeSnapshots) {
-    const totalUsd = Object.entries(byCurrency).reduce((sum, [currency, values]) => (
-      sum + values.value * (rates[currency] || 0)
-    ), 0)
-    const costUsd = Object.entries(byCurrency).reduce((sum, [currency, values]) => (
-      sum + values.cost * (rates[currency] || 0)
-    ), 0)
-    const annualUsd = Object.entries(byCurrency).reduce((sum, [currency, values]) => (
-      sum + values.dividends * (rates[currency] || 0)
-    ), 0)
-    checkMilestones({
-      total_value: totalUsd,
-      total_cost: costUsd,
-      total_gain: totalUsd - costUsd,
-      annual_dividends: annualUsd,
-      positions: Object.values(byCurrency).reduce((sum, values) => sum + values.positions, 0),
-    }, scopeKey)
-  }
 }
 
 function checkPriceAlerts(quotes) {

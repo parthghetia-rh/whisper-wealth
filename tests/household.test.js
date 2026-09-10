@@ -66,7 +66,7 @@ test('v2 data migrates to Primary and household scopes stay isolated without pro
   const portfolioRouter = (await import('../server/routes/portfolio.js')).default
 
   const primary = stmtGet('SELECT * FROM household_members WHERE is_primary = 1')
-  assert.equal(stmtGet('PRAGMA user_version').user_version, 4)
+  assert.equal(stmtGet('PRAGMA user_version').user_version, 5)
   assert.equal(primary.name, 'Primary')
   assert.equal(stmtGet('SELECT member_id FROM transactions WHERE ticker = ?', ['AAPL']).member_id, primary.id)
   assert.equal(stmtGet('SELECT member_id FROM cash_positions').member_id, primary.id)

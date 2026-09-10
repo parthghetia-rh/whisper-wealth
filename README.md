@@ -49,6 +49,7 @@ Most portfolio trackers require you to hand your financial data to a third party
 - **Dividend Tracking** — Projected weekly/monthly/yearly dividend income from actual payment history
 - **DRIP (Dividend Reinvestment)** — Auto-reinvest dividends with fractional/whole share toggle
 - **Cash & Income** — Track sitting cash with interest (simple or compound) and recurring income (cashback, rent, paybacks)
+- **Contribution Room** — Track TFSA, RRSP, FHSA, or custom registered-account room per household member with dated contributions, withdrawals, and corrections
 - **Multi-Currency Support** — USD, CAD, INR, EUR, GBP and more with live forex conversion
 - **Currency Converter** — Toggle display currency to see your entire portfolio converted at live rates
 - **Portfolio Allocation** — Pie chart and percentage breakdown with hide/show values toggle

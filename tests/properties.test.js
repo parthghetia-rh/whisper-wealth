@@ -18,7 +18,7 @@ test('properties track household-scoped equity, appreciation, and editable histo
     "INSERT INTO household_members (name, color) VALUES ('Partner', '#22c55e')"
   ).lastInsertRowid
 
-  assert.equal(stmtGet('PRAGMA user_version').user_version, 4)
+  assert.equal(stmtGet('PRAGMA user_version').user_version, 5)
   assert.ok(stmtGet("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'properties'"))
   assert.ok(stmtGet("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'property_snapshots'"))
 

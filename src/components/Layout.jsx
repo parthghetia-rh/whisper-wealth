@@ -13,7 +13,7 @@ const DEFAULT_NAV = [
   { to: '/expenses', label: 'Expenses', icon: 'expenses', short: 'Bills' },
   { to: '/real-estate', label: 'Real Estate', icon: 'property', short: 'Homes' },
   { to: '/watchlist', label: 'Watchlist', icon: 'watchlist', short: 'Watch' },
-  { to: '/milestones', label: 'Milestones', icon: 'milestone', short: 'Goals' },
+  { to: '/contribution-room', label: 'Contribution Room', icon: 'contribution', short: 'Room' },
 ]
 
 const ICONS = {
@@ -24,7 +24,7 @@ const ICONS = {
   property: PropertyIcon,
   cash: CashIcon,
   watchlist: WatchlistIcon,
-  milestone: MilestoneIcon,
+  contribution: ContributionIcon,
 }
 
 const NAV_ORDER_KEY = 'folio-nav-order'
@@ -41,7 +41,7 @@ function getStoredOrder() {
   try {
     const saved = localStorage.getItem(NAV_ORDER_KEY)
     if (!saved) return null
-    const order = JSON.parse(saved)
+    const order = JSON.parse(saved).map((path) => path === '/milestones' ? '/contribution-room' : path)
     const defaultPaths = DEFAULT_NAV.map((n) => n.to)
     if (Array.isArray(order) && order.every((path) => defaultPaths.includes(path))) {
       return [...order, ...defaultPaths.filter((path) => !order.includes(path))]
@@ -575,10 +575,11 @@ function MoreIcon() {
   )
 }
 
-function MilestoneIcon() {
+function ContributionIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M8 1.5l1.8 3.7 4.1.6-3 2.9.7 4.1L8 10.9l-3.6 1.9.7-4.1-3-2.9 4.1-.6L8 1.5z" />
+      <rect x="2" y="3" width="12" height="10" rx="2" />
+      <path d="M5 8h6M8 5v6" />
     </svg>
   )
 }

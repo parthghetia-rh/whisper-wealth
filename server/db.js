@@ -34,7 +34,7 @@ if (existsSync(dbPath)) {
 db.run('PRAGMA foreign_keys = ON')
 
 const currentSchemaVersion = db.exec('PRAGMA user_version')[0]?.values?.[0]?.[0] || 0
-if (existsSync(dbPath) && currentSchemaVersion < 4) {
+if (existsSync(dbPath) && currentSchemaVersion < 5) {
   try {
     mkdirSync(backupDir, { recursive: true })
     const stamp = new Date().toISOString().replace(/[:.]/g, '-')
@@ -294,6 +294,38 @@ db.run('CREATE INDEX IF NOT EXISTS idx_properties_member ON properties(member_id
 db.run('CREATE INDEX IF NOT EXISTS idx_property_snapshots_property_date ON property_snapshots(property_id, valuation_date)')
 
 db.run(`
+  CREATE TABLE IF NOT EXISTS contribution_rooms (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    member_id INTEGER NOT NULL REFERENCES household_members(id) ON DELETE CASCADE,
+    account_type TEXT NOT NULL CHECK(account_type IN ('TFSA', 'RRSP', 'FHSA', 'OTHER')),
+    label TEXT NOT NULL,
+    year INTEGER NOT NULL,
+    currency TEXT NOT NULL DEFAULT 'CAD',
+    opening_room REAL NOT NULL DEFAULT 0,
+    note TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(member_id, account_type, year)
+  )
+`)
+
+db.run(`
+  CREATE TABLE IF NOT EXISTS contribution_entries (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    room_id INTEGER NOT NULL REFERENCES contribution_rooms(id) ON DELETE CASCADE,
+    entry_type TEXT NOT NULL CHECK(entry_type IN ('contribution', 'withdrawal', 'adjustment')),
+    amount REAL NOT NULL,
+    entry_date TEXT NOT NULL,
+    note TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now'))
+  )
+`)
+
+db.run('CREATE INDEX IF NOT EXISTS idx_contribution_rooms_member_year ON contribution_rooms(member_id, year)')
+db.run('CREATE INDEX IF NOT EXISTS idx_contribution_entries_room_date ON contribution_entries(room_id, entry_date)')
+
+db.run(`
   CREATE TABLE IF NOT EXISTS portfolio_snapshots_v3 (
     date TEXT NOT NULL,
     scope_key TEXT NOT NULL,
@@ -307,7 +339,7 @@ db.run(`
   )
 `)
 
-// Keep the legacy milestone table readable while scoped milestones are seeded.
+// Retain legacy milestone rows as an inaccessible archive; the feature is no longer routed.
 db.run(`
   CREATE TABLE IF NOT EXISTS milestones (
     id TEXT PRIMARY KEY,
@@ -518,7 +550,7 @@ function getDbHealth() {
   }
 }
 
-if (currentSchemaVersion < 4) db.run('PRAGMA user_version = 4')
+if (currentSchemaVersion < 5) db.run('PRAGMA user_version = 5')
 saveNow()
 
 export {

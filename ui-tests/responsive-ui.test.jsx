@@ -8,13 +8,15 @@ import { MOBILE_PRIMARY_PATHS, isMobileMoreRoute } from '../src/components/Layou
 import { MobileTransactionCard } from '../src/pages/Transactions'
 import { MobileCashCard } from '../src/pages/Cash'
 import { MobileExpenseCard } from '../src/pages/Expenses'
+import { ContributionRoomCard } from '../src/pages/ContributionRoom'
 
 describe('mobile navigation', () => {
   it('keeps four primary destinations and routes secondary screens through More', () => {
     expect(MOBILE_PRIMARY_PATHS).toEqual(['/', '/transactions', '/dividends', '/watchlist'])
     expect(isMobileMoreRoute('/cash')).toBe(true)
     expect(isMobileMoreRoute('/real-estate')).toBe(true)
-    expect(isMobileMoreRoute('/milestones')).toBe(true)
+    expect(isMobileMoreRoute('/contribution-room')).toBe(true)
+    expect(isMobileMoreRoute('/milestones')).toBe(false)
     expect(isMobileMoreRoute('/settings')).toBe(true)
     expect(isMobileMoreRoute('/watchlist')).toBe(false)
   })
@@ -63,5 +65,25 @@ describe('responsive controls', () => {
     expect(cash).toContain('aria-label="Delete Savings"')
     expect(expense).toContain('aria-label="Edit Rent"')
     expect(transaction + cash + expense).not.toContain('<table')
+  })
+
+  it('renders contribution room with accessible progress and mobile actions', () => {
+    const html = renderToStaticMarkup(
+      <ContributionRoomCard
+        room={{
+          id: 1, account_type: 'TFSA', label: 'TFSA room', owner_name: 'Primary',
+          owner_color: '#6366f1', year: 2026, currency: 'CAD', opening_room: 7000,
+          adjustments: 0, available_room: 7000, contributed: 2000, withdrawn: 500,
+          remaining: 5000, over_contribution: 0, used_percent: 28.57,
+          entries: [{ id: 1, entry_type: 'contribution', amount: 2000, entry_date: '2026-01-10', note: 'Deposit' }],
+        }}
+        onAddEntry={() => {}} onEditRoom={() => {}} onDeleteRoom={() => {}}
+        onEditEntry={() => {}} onDeleteEntry={() => {}}
+      />
+    )
+    expect(html).toContain('role="progressbar"')
+    expect(html).toContain('aria-label="Edit TFSA room"')
+    expect(html).toContain('aria-label="Delete activity from 2026-01-10"')
+    expect(html).toContain('Withdrawn')
   })
 })

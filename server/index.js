@@ -11,7 +11,7 @@ import dividendsRouter from './routes/dividends.js'
 import cashRouter from './routes/cash.js'
 import watchlistRouter from './routes/watchlist.js'
 import settingsRouter from './routes/settings.js'
-import milestonesRouter from './routes/milestones.js'
+import contributionRoomRouter from './routes/contributionRoom.js'
 import expensesRouter from './routes/expenses.js'
 import householdRouter from './routes/household.js'
 import propertiesRouter from './routes/properties.js'
@@ -74,7 +74,7 @@ app.use('/api/dividends', dividendsRouter)
 app.use('/api/cash', cashRouter)
 app.use('/api/watchlist', watchlistRouter)
 app.use('/api/settings', settingsRouter)
-app.use('/api/milestones', milestonesRouter)
+app.use('/api/contribution-room', contributionRoomRouter)
 app.use('/api/expenses', expensesRouter)
 app.use('/api/household', householdRouter)
 app.use('/api/properties', propertiesRouter)
