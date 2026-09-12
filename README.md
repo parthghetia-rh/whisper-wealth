@@ -290,6 +290,8 @@ A sample Wealthsimple CSV is included at `samples/wealthsimple-sample.csv`.
 
 ## Data & Backup
 
+For a NAS-to-XPS move with the existing portfolio and login token, follow [XPS-MIGRATION.md](XPS-MIGRATION.md) before changing Caddy.
+
 Your portfolio lives in `portfolio.db`. WhisperWealth creates a backup before this schema upgrade and one atomic backup daily, retaining 14 days. Docker Compose binds them to `./backups`.
 
 ```bash

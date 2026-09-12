@@ -4,6 +4,9 @@ dist
 portfolio.db
 portfolio.db.tmp
 .auth-token
+backups/
+.env
+.env.*
 .git
 .gitignore
 *.md
