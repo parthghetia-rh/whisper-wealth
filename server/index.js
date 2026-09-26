@@ -22,6 +22,11 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 const app = express()
 const PORT = process.env.PORT || 3000
 const HOST = process.env.HOST || '127.0.0.1'
+const TRUST_PROXY = process.env.TRUST_PROXY?.trim()
+
+// Keep direct-development traffic untrusted by default. Production Compose
+// explicitly trusts only the local/private hops used by Docker and Tailscale.
+if (TRUST_PROXY) app.set('trust proxy', TRUST_PROXY)
 
 app.use(helmet({
   contentSecurityPolicy: {
@@ -98,6 +103,7 @@ app.use((err, req, res, next) => {
 
 const server = app.listen(PORT, HOST, () => {
   console.log(`WhisperWealth running at http://${HOST}:${PORT}`)
+  if (TRUST_PROXY) console.log(`Trusted proxy ranges: ${TRUST_PROXY}`)
   if (getIsFirstRun()) {
     console.log('=== FIRST RUN ===')
     console.log(`Your auth token: ${getToken()}`)

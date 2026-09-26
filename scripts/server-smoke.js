@@ -12,6 +12,7 @@ const child = spawn(process.execPath, ['server/index.js'], {
     NODE_ENV: 'production',
     HOST: '127.0.0.1',
     PORT: String(port),
+    TRUST_PROXY: 'loopback,linklocal,uniquelocal',
     DB_PATH: join(directory, 'portfolio.db'),
     TOKEN_PATH: join(directory, '.auth-token'),
     BACKUP_DIR: join(directory, 'backups'),
@@ -40,6 +41,15 @@ try {
   const initialHealth = await waitForHealth()
   const token = readFileSync(join(directory, '.auth-token'), 'utf8').trim()
   const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
+  const proxiedRequest = await fetch(`http://127.0.0.1:${port}/api/portfolio`, {
+    headers: { ...headers, 'X-Forwarded-For': '203.0.113.10' },
+  })
+  if (!proxiedRequest.ok) throw new Error(`Forwarded request failed: ${proxiedRequest.status}`)
+  await wait(50)
+  if (logs.includes('ERR_ERL_UNEXPECTED_X_FORWARDED_FOR')) {
+    throw new Error('Forwarded request triggered the Express rate-limit proxy validation error')
+  }
+
   const today = new Date().toISOString().split('T')[0]
   const transaction = await fetch(`http://127.0.0.1:${port}/api/transactions`, {
     method: 'POST', headers,
@@ -78,6 +88,7 @@ try {
     rss_mb: finalHealth.market.rss_mb,
     backups: backups.length,
     sse: 'connected',
+    forwarded_request: 'accepted',
   }, null, 2))
 } catch (err) {
   console.error(err.message)

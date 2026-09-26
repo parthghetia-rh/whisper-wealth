@@ -16,7 +16,7 @@ try {
   accessSync(backupDir, constants.W_OK)
 } catch {
   const fallback = join(dirname(dbPath), 'backups')
-  console.warn(`Backup directory ${backupDir} is not writable; using ${fallback}`)
+  console.warn(`Backup directory ${backupDir} is not writable; using persisted fallback ${fallback}`)
   backupDir = fallback
   mkdirSync(backupDir, { recursive: true })
 }

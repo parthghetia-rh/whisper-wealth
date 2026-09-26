@@ -242,6 +242,7 @@ WhisperWealth supports device biometric authentication to protect your portfolio
 |---------------------|---------|-------------|
 | `PORT` | `3000` | Server port |
 | `HOST` | `127.0.0.1` | Bind address (`0.0.0.0` inside Docker) |
+| `TRUST_PROXY` | Disabled | Comma-separated trusted reverse-proxy ranges; Compose trusts only loopback, link-local, and private hops |
 | `DB_PATH` | `./portfolio.db` | Path to the SQLite database file |
 | `TOKEN_PATH` | `./.auth-token` | Path to the auto-generated auth token file |
 | `CORS_ORIGINS` | localhost variants | Comma-separated allowed origins |
@@ -265,6 +266,7 @@ WhisperWealth supports device biometric authentication to protect your portfolio
 - Bearer token auth on all API endpoints
 - Helmet security headers (X-Content-Type-Options, X-Frame-Options, etc.)
 - Rate limiting on all API routes (120 req/min) and refresh endpoint (3 req/min)
+- Reverse-proxy client IPs are accepted only from the local/private proxy hops configured by Compose
 - Request body size capped at 100KB
 - Input validation with length limits, format regex, and `Number.isFinite()` checks
 - SSE connection limit (max 20 clients)

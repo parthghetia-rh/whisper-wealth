@@ -11,6 +11,7 @@ services:
       - NODE_ENV=production
       - HOST=0.0.0.0
       - PORT=3000
+      - TRUST_PROXY=loopback,linklocal,uniquelocal
       - DB_PATH=/data/portfolio.db
       - TOKEN_PATH=/data/.auth-token
       - BACKUP_DIR=/backups
