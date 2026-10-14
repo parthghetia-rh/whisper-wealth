@@ -1,11 +1,43 @@
 import { Router } from 'express'
 import { stmtAll, stmtGet, stmtRun } from '../db.js'
-import { getChartData } from '../services/stockService.js'
+import { getChartData, getQuotes } from '../services/stockService.js'
 import { refreshMarketData } from '../services/marketDataService.js'
 
 const router = Router()
 const TICKER_RE = /^[A-Z0-9.\-=]{1,20}$/
 const MAX_WATCHLIST = 200
+const lookupCache = new Map()
+const lookupJobs = new Map()
+
+// Explicit lookups only: typing in the search box never calls the provider.
+router.get('/quote/:ticker', async (req, res) => {
+  const ticker = req.params.ticker.trim().toUpperCase()
+  if (!TICKER_RE.test(ticker)) return res.status(400).json({ error: 'Invalid ticker' })
+  const stored = stmtGet('SELECT * FROM quotes WHERE ticker = ?', [ticker])
+  if (stored?.price != null) return res.json(stored)
+  const cached = lookupCache.get(ticker)
+  if (cached && Date.now() - cached.at < 60_000) return res.json(cached.quote)
+  try {
+    if (!lookupJobs.has(ticker)) {
+      if (lookupJobs.size >= 8) return res.status(429).json({ error: 'Search is busy. Please try again shortly.' })
+      lookupJobs.set(ticker, getQuotes([ticker]).then(({ quotes, failures }) => {
+        if (!quotes.length) {
+          const error = new Error(failures[0]?.kind === 'invalid' ? 'Ticker not found. Check the exchange suffix (for example, .TO).' : 'Market data is temporarily unavailable. Try again shortly.')
+          error.status = failures[0]?.kind === 'invalid' ? 404 : 503
+          throw error
+        }
+        const quote = { ...quotes[0], status: 'fresh', last_success_at: new Date().toISOString() }
+        lookupCache.delete(ticker)
+        lookupCache.set(ticker, { quote, at: Date.now() })
+        if (lookupCache.size > 100) lookupCache.delete(lookupCache.keys().next().value)
+        return quote
+      }).finally(() => lookupJobs.delete(ticker)))
+    }
+    res.json(await lookupJobs.get(ticker))
+  } catch (err) {
+    res.status(err.status || 503).json({ error: err.message })
+  }
+})
 
 router.get('/', (req, res) => {
   const rows = stmtAll('SELECT * FROM watchlist ORDER BY sort_order ASC, id ASC')

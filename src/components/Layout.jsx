@@ -4,6 +4,7 @@ import { themes, getStoredTheme, applyTheme } from '../utils/themes'
 import NotificationBell from './NotificationBell'
 import { useHousehold } from '../context/HouseholdContext'
 import ActionSheet from './ActionSheet'
+import TickerSearch, { SearchIcon } from './TickerSearch'
 
 const DEFAULT_NAV = [
   { to: '/', label: 'Dashboard', icon: 'dashboard', short: 'Home' },
@@ -61,6 +62,7 @@ export default function Layout({ onLogout }) {
   const [currentTheme, setCurrentTheme] = useState(getStoredTheme)
   const [themeOpen, setThemeOpen] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [searchOpen, setSearchOpen] = useState(false)
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem(SIDEBAR_KEY) === 'true')
   const [navItems, setNavItems] = useState(getOrderedNav)
   const [dragIdx, setDragIdx] = useState(null)
@@ -341,6 +343,7 @@ export default function Layout({ onLogout }) {
             <span className="truncate text-sm font-semibold text-text">WhisperWealth</span>
           </NavLink>
           <div className="ml-auto flex shrink-0 items-center gap-1">
+            <button type="button" onClick={() => setSearchOpen(true)} aria-label="Search tickers" className="icon-button shrink-0"><SearchIcon /></button>
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg hover:bg-surface-3">
               <NotificationBell />
             </div>
@@ -426,7 +429,7 @@ export default function Layout({ onLogout }) {
         </ActionSheet>
 
         <div className="hidden items-center justify-between gap-3 border-b border-border bg-surface-2/60 px-6 py-2 md:flex">
-          <span className="text-[10px] uppercase tracking-wider text-text-muted">Portfolio view</span>
+          <button type="button" onClick={() => setSearchOpen(true)} className="flex min-h-10 items-center gap-2 rounded-lg px-3 text-sm text-text-muted hover:bg-surface-3 hover:text-text"><SearchIcon />Search tickers</button>
           <select
             value={scope}
             onChange={(event) => setScope(event.target.value)}
@@ -438,6 +441,7 @@ export default function Layout({ onLogout }) {
           </select>
         </div>
 
+        <TickerSearch open={searchOpen} onClose={() => setSearchOpen(false)} />
         <main className="flex-1 overflow-auto p-4 pb-24 md:p-6 md:pb-6">
           <Outlet />
         </main>

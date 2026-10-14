@@ -15,20 +15,36 @@ export default function TickerChart({ ticker, currency }) {
   const [range, setRange] = useState('1y')
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [retry, setRetry] = useState(0)
 
   useEffect(() => {
     setLoading(true)
+    setData(null)
+    setError(null)
+    const controller = new AbortController()
     const token = localStorage.getItem('folio-auth-token')
-    fetch(`/api/watchlist/chart/${ticker}?range=${range}`, {
+    fetch(`/api/watchlist/chart/${encodeURIComponent(ticker)}?range=${range}`, {
       headers: { Authorization: `Bearer ${token}` },
+      signal: controller.signal,
     })
-      .then((r) => r.json())
+      .then(async (r) => {
+        const body = await r.json()
+        if (!r.ok) throw new Error(body.error || 'Unable to load chart')
+        return body
+      })
       .then((d) => {
+        if (controller.signal.aborted) return
         setData(d.data || [])
         setLoading(false)
       })
-      .catch(() => setLoading(false))
-  }, [ticker, range])
+      .catch((err) => {
+        if (controller.signal.aborted) return
+        setError(err.message)
+        setLoading(false)
+      })
+    return () => controller.abort()
+  }, [ticker, range, retry])
 
   const sym = currencySymbol(currency || 'USD')
 
@@ -83,6 +99,11 @@ export default function TickerChart({ ticker, currency }) {
       {loading ? (
         <div className="flex h-44 items-center justify-center text-xs text-text-muted sm:h-40">
           Loading chart...
+        </div>
+      ) : error ? (
+        <div role="alert" className="flex h-44 flex-col items-center justify-center gap-2 text-xs text-red sm:h-40">
+          <span>{error}</span>
+          <button type="button" onClick={() => setRetry((value) => value + 1)} className="underline">Retry chart</button>
         </div>
       ) : !data || data.length < 2 ? (
         <div className="flex h-44 items-center justify-center text-xs text-text-muted sm:h-40">
