@@ -1,8 +1,23 @@
-import { useEffect, useId } from 'react'
+import { useEffect, useId, useState } from 'react'
 
 export default function ActionSheet({ open, onClose, title, description, children, size = '2xl' }) {
   const titleId = useId()
   const descriptionId = useId()
+  const [viewport, setViewport] = useState(null)
+
+  useEffect(() => {
+    if (!open || !window.visualViewport) return undefined
+    const visualViewport = window.visualViewport
+    // Mobile keyboards shrink the visual viewport without resizing fixed overlays.
+    const updateViewport = () => setViewport({ top: visualViewport.offsetTop, height: visualViewport.height })
+    updateViewport()
+    visualViewport.addEventListener('resize', updateViewport)
+    visualViewport.addEventListener('scroll', updateViewport)
+    return () => {
+      visualViewport.removeEventListener('resize', updateViewport)
+      visualViewport.removeEventListener('scroll', updateViewport)
+    }
+  }, [open])
 
   useEffect(() => {
     if (!open) return undefined
@@ -23,7 +38,8 @@ export default function ActionSheet({ open, onClose, title, description, childre
   const maxWidth = size === '3xl' ? 'sm:max-w-3xl' : size === 'lg' ? 'sm:max-w-lg' : 'sm:max-w-2xl'
 
   return (
-    <div className="fixed inset-0 z-[120] flex items-end justify-center sm:items-center sm:p-6">
+    <div className="fixed inset-0 z-[120] flex items-end justify-center sm:items-center sm:p-6"
+      style={viewport ? { top: viewport.top, height: viewport.height, bottom: 'auto' } : undefined}>
       <button
         type="button"
         className="absolute inset-0 bg-black/65 backdrop-blur-[2px]"
@@ -35,6 +51,7 @@ export default function ActionSheet({ open, onClose, title, description, childre
         aria-modal="true"
         aria-labelledby={titleId}
         aria-describedby={description ? descriptionId : undefined}
+        style={viewport ? { maxHeight: 'min(88dvh, 100%)' } : undefined}
         className={`relative z-10 max-h-[88dvh] w-full overflow-y-auto rounded-t-2xl border border-border bg-surface-2 shadow-2xl sm:rounded-2xl ${maxWidth}`}
       >
         <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-border bg-surface-2/95 px-4 py-3 backdrop-blur sm:px-5">

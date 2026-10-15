@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState } from 'react'
+import { lazy, Suspense, useRef, useState } from 'react'
 import ActionSheet from './ActionSheet'
 import StockCard from './StockCard'
 import { useApi } from '../hooks/useApi'
@@ -29,6 +29,7 @@ function SearchContent() {
   const [query, setQuery] = useState('')
   const [selected, setSelected] = useState('')
   const [validation, setValidation] = useState('')
+  const inputRef = useRef(null)
   const choose = (value) => {
     const ticker = value.trim().toUpperCase()
     if (!/^[A-Z0-9.\-=]{1,20}$/.test(ticker)) {
@@ -38,11 +39,12 @@ function SearchContent() {
     setValidation('')
     setQuery(ticker)
     setSelected(ticker)
+    inputRef.current?.blur()
   }
   const matches = matchingTickers(holdings || [], watchlist?.items || [], query)
   return <div className="space-y-4">
     <form onSubmit={(event) => { event.preventDefault(); choose(query) }} className="flex min-w-0 gap-2">
-      <input autoFocus aria-label="Ticker or company in your portfolio" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search IBM, Apple, XEQT.TO…" maxLength={80} className="min-h-11 min-w-0 flex-1 rounded-lg border border-border bg-surface-3 px-3 text-sm outline-none focus:border-accent" />
+      <input ref={inputRef} autoFocus type="search" enterKeyHint="search" autoComplete="off" autoCorrect="off" spellCheck={false} aria-label="Ticker or company in your portfolio" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search IBM, Apple, XEQT.TO…" maxLength={80} className="min-h-11 min-w-0 flex-1 rounded-lg border border-border bg-surface-3 px-3 text-base sm:text-sm outline-none focus:border-accent" />
       <button type="submit" disabled={!query.trim()} className="min-h-11 shrink-0 rounded-lg bg-accent px-4 text-sm font-medium text-white disabled:opacity-50">Search</button>
     </form>
     {validation && <p role="alert" className="text-sm text-red">{validation}</p>}
